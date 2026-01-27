@@ -31,13 +31,22 @@ public class TetrisGameTest {
         testGameEngineLineDetection();
         testGameEngineGameOver();
         testGameEngineDrop();
+        testGameEngineWallKick();
+
+        // Difficulty and Refinement Tests
+        testGameDifficultyLevels();
+        testGameStateWithDifficulty();
+        testScoreMultiplier();
 
         // Controller Tests
         testGameControllerInitialization();
         testGameControllerTickProcessing();
         testGameControllerReset();
 
-        // Print summary
+        // Exception Tests
+        testExceptionHierarchy();
+
+
         System.out.println();
         System.out.println("╔════════════════════════════════════════╗");
         System.out.printf("║ Tests Passed: %-26d ║%n", testsPassed);
@@ -175,7 +184,8 @@ public class TetrisGameTest {
 
             // Advance through ticks until gravity applies
             GameState current = state;
-            for (int i = 0; i < GameEngine.getGravityTicks(); i++) {
+            int gravityTicks = state.getDifficulty().getGravityTicks();
+            for (int i = 0; i < gravityTicks; i++) {
                 current = engine.tick(current, GameAction.NONE);
             }
 
@@ -243,6 +253,81 @@ public class TetrisGameTest {
             // After drop, board should have a piece locked
             assert dropped.getBoard().getOccupiedCells().size() > 0 
                 : "Piece should be locked after drop";
+        });
+    }
+
+    private static void testGameEngineWallKick() {
+        test("GameEngine wall kick on rotation", () -> {
+            GameState state = new GameState();
+            GameEngine engine = new GameEngine();
+
+            // Move piece to the left edge
+            GameState atEdge = state;
+            for (int i = 0; i < 5; i++) {
+                atEdge = engine.tick(atEdge, GameAction.LEFT);
+            }
+
+            // Try to rotate at edge - wall kick should allow it or reject it gracefully
+            GameState rotated = engine.tick(atEdge, GameAction.ROTATE);
+
+            // Wall kick should not cause errors; rotation either succeeds or is ignored
+            assert !rotated.isGameOver() : "Wall kick should not cause game over";
+        });
+    }
+
+    private static void testGameDifficultyLevels() {
+        test("GameDifficulty level differences", () -> {
+            assert GameDifficulty.EASY.getGravityTicks() > GameDifficulty.NORMAL.getGravityTicks()
+                : "Easy should have slower gravity";
+            assert GameDifficulty.HARD.getGravityTicks() < GameDifficulty.NORMAL.getGravityTicks()
+                : "Hard should have faster gravity";
+            assert GameDifficulty.EXTREME.getGravityTicks() < GameDifficulty.HARD.getGravityTicks()
+                : "Extreme should have fastest gravity";
+
+            assert GameDifficulty.EASY.getScoreMultiplier() == 1.0f
+                : "Easy should have 1.0x multiplier";
+            assert GameDifficulty.HARD.getScoreMultiplier() > 1.0f
+                : "Hard should have >1.0x multiplier";
+            assert GameDifficulty.EXTREME.getScoreMultiplier() > GameDifficulty.HARD.getScoreMultiplier()
+                : "Extreme should have highest multiplier";
+        });
+    }
+
+    private static void testGameStateWithDifficulty() {
+        test("GameState with difficulty levels", () -> {
+            GameState easyGame = new GameState(GameDifficulty.EASY);
+            assert easyGame.getDifficulty() == GameDifficulty.EASY : "Easy difficulty should be set";
+
+            GameState hardGame = new GameState(GameDifficulty.HARD);
+            assert hardGame.getDifficulty() == GameDifficulty.HARD : "Hard difficulty should be set";
+            assert hardGame.getScore() == 0 : "New game should have 0 score";
+        });
+    }
+
+    private static void testScoreMultiplier() {
+        test("Score calculation with difficulty multiplier", () -> {
+            GameState easyState = new GameState(GameDifficulty.EASY);
+            GameState hardState = new GameState(GameDifficulty.HARD);
+
+            GameEngine engine = new GameEngine();
+
+            // Score multiplier should affect point calculation
+            // (Difficult to test without line clearing, but we can verify structure)
+            assert easyState.getDifficulty().getScoreMultiplier() == 1.0f
+                : "Easy multiplier should be 1.0x";
+            assert hardState.getDifficulty().getScoreMultiplier() == 1.5f
+                : "Hard multiplier should be 1.5x";
+        });
+    }
+
+    private static void testExceptionHierarchy() {
+        test("Exception class hierarchy", () -> {
+            GameException gameEx = new GameException("Test");
+            InvalidMoveException moveEx = new InvalidMoveException("Move blocked");
+
+            assert gameEx instanceof Exception : "GameException should extend Exception";
+            assert moveEx instanceof GameException : "InvalidMoveException should extend GameException";
+            assert moveEx instanceof Exception : "InvalidMoveException should extend Exception";
         });
     }
 

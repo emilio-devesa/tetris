@@ -5,21 +5,33 @@ import java.util.Set;
 
 /**
  * Core game engine implementing the Tetris game logic.
- * Handles movement, collision detection, gravity, and line clearing.
+ * Handles movement, collision detection, gravity, wall kick, and line clearing.
  * 
- * This class manages the game loop with tick-based updates.
  * The engine is stateless - it takes a GameState and produces a new one.
+ * All decisions are pure functions of the input state and action.
+ *
+ * Features:
+ * - Gravity-based falling with difficulty scaling
+ * - Wall kick for rotation (automatic horizontal adjustment near walls)
+ * - Collision detection with board boundaries and fixed pieces
+ * - Line completion detection and clearing with score calculation
+ * - Game over condition when new piece cannot spawn
  */
 public class GameEngine {
-    private static final int GRAVITY_TICKS = 10; // Fall every N ticks
     private static final int SCORE_PER_LINE = 100;
+    private static final int WALL_KICK_OFFSET = 1; // Try one cell away on wall kick
 
     /**
      * Processes a game tick with an optional action.
      * 
-     * @param state Current game state
-     * @param action Player action (or NONE for no input)
-     * @return New game state after processing
+     * This method:
+     * 1. Processes any player input action
+     * 2. Applies gravity at intervals based on difficulty
+     * 3. Increments the tick counter
+     * 
+     * @param state  current game state
+     * @param action player action (or NONE for no input)
+     * @return new game state after processing
      */
     public GameState tick(GameState state, GameAction action) {
         if (state.isGameOver()) {
@@ -33,8 +45,9 @@ public class GameEngine {
             updated = processAction(updated, action);
         }
 
-        // Apply gravity
-        if (updated.getTickCount() % GRAVITY_TICKS == 0) {
+        // Apply gravity based on difficulty
+        int gravityTicks = updated.getDifficulty().getGravityTicks();
+        if (updated.getTickCount() % gravityTicks == 0) {
             updated = applyGravity(updated);
         }
 
@@ -48,6 +61,11 @@ public class GameEngine {
 
     /**
      * Processes a player action on the current piece.
+     * Attempts movement, rotation, or instant drop.
+     *
+     * @param state  current game state
+     * @param action the action to perform
+     * @return new game state after action processing
      */
     private GameState processAction(GameState state, GameAction action) {
         Tetromino current = state.getCurrentPiece();
@@ -90,8 +108,18 @@ public class GameEngine {
                     return new GameState.Builder(state)
                             .withCurrentPiece(rotated)
                             .build();
+                } else if (attemptWallKick(rotated, board)) {
+                    // Try wall kick: shift left or right to fit rotation
+                    Tetromino wallKicked = rotated.moveTo(
+                            rotated.getPosition().translate(0, getWallKickDirection(rotated, board))
+                    );
+                    if (canPlace(wallKicked, board)) {
+                        return new GameState.Builder(state)
+                                .withCurrentPiece(wallKicked)
+                                .build();
+                    }
                 }
-                // Rotation blocked - do nothing
+                // Rotation blocked even with wall kick - do nothing
                 break;
 
             case DROP:
@@ -108,7 +136,10 @@ public class GameEngine {
 
     /**
      * Applies gravity to the falling piece.
-     * If piece can't fall, it locks in place.
+     * If piece can't fall, it locks in place and a new piece spawns.
+     *
+     * @param state current game state
+     * @return new game state after gravity application
      */
     private GameState applyGravity(GameState state) {
         Tetromino current = state.getCurrentPiece();
@@ -126,6 +157,10 @@ public class GameEngine {
 
     /**
      * Instantly drops the piece to the bottom.
+     * Locks piece and spawns new one immediately.
+     *
+     * @param state current game state
+     * @return new game state after drop
      */
     private GameState dropToBottom(GameState state) {
         Tetromino current = state.getCurrentPiece();
@@ -149,6 +184,10 @@ public class GameEngine {
 
     /**
      * Locks the current piece on the board and spawns a new one.
+     * Detects and clears completed rows, updates score and statistics.
+     *
+     * @param state current game state before locking
+     * @return new game state with piece locked and new piece spawned
      */
     private GameState lockPieceAndSpawnNew(GameState state) {
         Tetromino current = state.getCurrentPiece();
@@ -158,8 +197,11 @@ public class GameEngine {
         Set<Integer> completeRows = boardWithPiece.getCompleteRows();
         Board boardAfterClear = boardWithPiece.clearRows(completeRows);
 
-        int newScore = state.getScore() + (completeRows.size() * SCORE_PER_LINE);
-        int newLinesCleared = state.getLinesCleared() + completeRows.size();
+        // Calculate score with difficulty multiplier
+        int linesCleared = completeRows.size();
+        int scoreGained = (int)(linesCleared * SCORE_PER_LINE * state.getDifficulty().getScoreMultiplier());
+        int newScore = state.getScore() + scoreGained;
+        int newLinesCleared = state.getLinesCleared() + linesCleared;
 
         // Spawn new piece at top-left
         Tetromino newPiece = new Tetromino(new Point(0, 0));
@@ -185,16 +227,63 @@ public class GameEngine {
 
     /**
      * Checks if a piece can be placed at its current position.
+     * Validates that all occupied cells are within bounds and not occupied.
+     *
+     * @param piece the tetromino to check
+     * @param board the current game board
+     * @return true if piece can be placed, false otherwise
      */
     private boolean canPlace(Tetromino piece, Board board) {
         Set<Point> cells = piece.getOccupiedCells();
         return board.canPlacePiece(cells);
     }
 
-    public static int getGravityTicks() {
-        return GRAVITY_TICKS;
+    /**
+     * Determines if a rotated piece near a wall can be wall-kicked.
+     * Wall kick allows rotation to succeed by shifting the piece one cell sideways.
+     *
+     * @param rotatedPiece the rotated tetromino
+     * @param board        the current board
+     * @return true if wall kick might help
+     */
+    private boolean attemptWallKick(Tetromino rotatedPiece, Board board) {
+        // Check if rotation is blocked
+        return !canPlace(rotatedPiece, board);
     }
 
+    /**
+     * Determines the direction to shift for wall kick (left or right).
+     * Attempts right first, then left.
+     *
+     * @param rotatedPiece the rotated tetromino
+     * @param board        the current board
+     * @return -1 for left, +1 for right, 0 if no wall kick possible
+     */
+    private int getWallKickDirection(Tetromino rotatedPiece, Board board) {
+        // Try right first
+        Tetromino rightShift = rotatedPiece.moveTo(
+                rotatedPiece.getPosition().translate(0, WALL_KICK_OFFSET)
+        );
+        if (canPlace(rightShift, board)) {
+            return WALL_KICK_OFFSET;
+        }
+
+        // Try left
+        Tetromino leftShift = rotatedPiece.moveTo(
+                rotatedPiece.getPosition().translate(0, -WALL_KICK_OFFSET)
+        );
+        if (canPlace(leftShift, board)) {
+            return -WALL_KICK_OFFSET;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Returns the score per line cleared (base value before difficulty multiplier).
+     *
+     * @return base score for one line
+     */
     public static int getScorePerLine() {
         return SCORE_PER_LINE;
     }

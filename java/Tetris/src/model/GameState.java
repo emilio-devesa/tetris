@@ -11,7 +11,11 @@ public class GameState {
     private final int linesCleared;
     private final boolean gameOver;
     private final long tickCount;
+    private final GameDifficulty difficulty;
 
+    /**
+     * Constructs a new GameState with default settings (NORMAL difficulty).
+     */
     public GameState() {
         this.board = new Board();
         this.currentPiece = new Tetromino(new Point(0, 0));
@@ -19,16 +23,33 @@ public class GameState {
         this.linesCleared = 0;
         this.gameOver = false;
         this.tickCount = 0;
+        this.difficulty = GameDifficulty.NORMAL;
+    }
+
+    /**
+     * Constructs a new GameState with specified difficulty level.
+     *
+     * @param difficulty the game difficulty level
+     */
+    public GameState(GameDifficulty difficulty) {
+        this.board = new Board();
+        this.currentPiece = new Tetromino(new Point(0, 0));
+        this.score = 0;
+        this.linesCleared = 0;
+        this.gameOver = false;
+        this.tickCount = 0;
+        this.difficulty = difficulty;
     }
 
     private GameState(Board board, Tetromino currentPiece, int score, 
-                     int linesCleared, boolean gameOver, long tickCount) {
+                     int linesCleared, boolean gameOver, long tickCount, GameDifficulty difficulty) {
         this.board = board;
         this.currentPiece = currentPiece;
         this.score = score;
         this.linesCleared = linesCleared;
         this.gameOver = gameOver;
         this.tickCount = tickCount;
+        this.difficulty = difficulty;
     }
 
     // Builder pattern for creating modified game states
@@ -39,7 +60,13 @@ public class GameState {
         private int linesCleared;
         private boolean gameOver;
         private long tickCount;
+        private GameDifficulty difficulty;
 
+        /**
+         * Constructs a Builder initialized with values from the given GameState.
+         *
+         * @param state the GameState to copy values from
+         */
         public Builder(GameState state) {
             this.board = state.board;
             this.currentPiece = state.currentPiece;
@@ -47,6 +74,7 @@ public class GameState {
             this.linesCleared = state.linesCleared;
             this.gameOver = state.gameOver;
             this.tickCount = state.tickCount;
+            this.difficulty = state.difficulty;
         }
 
         public Builder withBoard(Board board) {
@@ -79,8 +107,18 @@ public class GameState {
             return this;
         }
 
+        public Builder withDifficulty(GameDifficulty difficulty) {
+            this.difficulty = difficulty;
+            return this;
+        }
+
+        /**
+         * Builds and returns a new GameState with the configured values.
+         *
+         * @return a new GameState instance
+         */
         public GameState build() {
-            return new GameState(board, currentPiece, score, linesCleared, gameOver, tickCount);
+            return new GameState(board, currentPiece, score, linesCleared, gameOver, tickCount, difficulty);
         }
     }
 
@@ -106,6 +144,15 @@ public class GameState {
 
     public long getTickCount() {
         return tickCount;
+    }
+
+    /**
+     * Returns the current game difficulty level.
+     *
+     * @return the GameDifficulty
+     */
+    public GameDifficulty getDifficulty() {
+        return difficulty;
     }
 
     @Override
