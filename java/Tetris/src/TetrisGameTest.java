@@ -1,6 +1,7 @@
 import controller.GameController;
 import model.*;
 import engine.GameEngine;
+import engine.GameDemo;
 
 /**
  * Comprehensive test suite for Tetris game.
@@ -46,7 +47,11 @@ public class TetrisGameTest {
         // Exception Tests
         testExceptionHierarchy();
 
-
+        // Advanced Features Tests
+        testGameStatistics();
+        testHighScoreManager();
+        testGameDemo();
+        testHighScorePersistence();
         System.out.println();
         System.out.println("╔════════════════════════════════════════╗");
         System.out.printf("║ Tests Passed: %-26d ║%n", testsPassed);
@@ -328,6 +333,64 @@ public class TetrisGameTest {
             assert gameEx instanceof Exception : "GameException should extend Exception";
             assert moveEx instanceof GameException : "InvalidMoveException should extend GameException";
             assert moveEx instanceof Exception : "InvalidMoveException should extend Exception";
+        });
+    }
+
+    private static void testGameStatistics() {
+        test("GameStatistics calculation", () -> {
+            GameState finalState = new GameState(GameDifficulty.HARD);
+            GameStatistics stats = new GameStatistics(finalState, 10000, 5);
+
+            assert stats.getFinalScore() >= 0 : "Score should be non-negative";
+            assert stats.getPlayDurationSeconds() > 0 : "Duration should be positive";
+            assert stats.getPiecesPlaced() == 5 : "Pieces should match";
+            assert stats.getDifficulty() == GameDifficulty.HARD : "Difficulty should match";
+        });
+    }
+
+    private static void testHighScoreManager() {
+        test("HighScoreManager functionality", () -> {
+            HighScoreManager manager = new HighScoreManager();
+            
+            GameState state1 = new GameState(GameDifficulty.NORMAL);
+            GameStatistics stats1 = new GameStatistics(state1, 10000, 5);
+            
+            manager.recordScore(stats1);
+            assert manager.getTopScores().size() > 0 : "Should have recorded score";
+            
+            manager.clearScores();
+            assert manager.getTopScores().isEmpty() : "Scores should be cleared";
+        });
+    }
+
+    private static void testGameDemo() {
+        test("GameDemo automatic play", () -> {
+            GameDemo demo = new GameDemo(GameDifficulty.EASY);
+            
+            // Run a few ticks
+            for (int i = 0; i < 50; i++) {
+                demo.tick();
+            }
+            
+            assert demo.getTickCount() == 50 : "Tick count should be 50";
+            assert !demo.getState().isGameOver() : "Should not be game over after 50 ticks";
+        });
+    }
+
+    private static void testHighScorePersistence() {
+        test("HighScore serialization", () -> {
+            HighScoreManager.HighScore score = new HighScoreManager.HighScore(
+                1000, GameDifficulty.HARD, 10, System.currentTimeMillis()
+            );
+            
+            String serialized = score.serialize();
+            assert serialized.contains("1000") : "Should contain score";
+            assert serialized.contains("HARD") : "Should contain difficulty";
+            assert serialized.contains("10") : "Should contain lines";
+            
+            HighScoreManager.HighScore parsed = HighScoreManager.HighScore.parse(serialized);
+            assert parsed != null : "Should parse successfully";
+            assert parsed.getScore() == 1000 : "Score should match";
         });
     }
 

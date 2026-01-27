@@ -1,6 +1,7 @@
 package view;
 
 import model.*;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -11,6 +12,7 @@ import java.util.Set;
  * - UTF-8 board rendering with Unicode characters
  * - Real-time game statistics display
  * - Difficulty level indicator
+ * - High score display
  * - Game over display
  * - Help and control information
  */
@@ -148,6 +150,51 @@ public class Renderer {
     private void renderControls() {
         System.out.println();
         System.out.println("Controls: LEFT | RIGHT | DOWN | ROTATE | DROP | QUIT");
+    }
+
+    /**
+     * Renders a list of high scores.
+     *
+     * @param topScores list of high scores to display
+     */
+    public void renderHighScores(List<HighScoreManager.HighScore> topScores) {
+        System.out.println();
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║        HIGH SCORES                 ║");
+        System.out.println("╠════════════════════════════════════╣");
+
+        if (topScores.isEmpty()) {
+            System.out.println("║  No scores yet. Play a game!       ║");
+        } else {
+            int rank = 1;
+            for (HighScoreManager.HighScore score : topScores) {
+                System.out.printf("║ %2d. %6d - %-14s (L:%2d) ║%n",
+                    rank++, score.getScore(), score.getDifficulty().name(), score.getLines());
+                if (rank > 10) break; // Limit to top 10
+            }
+        }
+
+        System.out.println("╚════════════════════════════════════╝");
+    }
+
+    /**
+     * Renders game statistics summary.
+     *
+     * @param statistics the statistics to display
+     */
+    public void renderStatistics(GameStatistics statistics) {
+        System.out.println();
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║        GAME STATISTICS             ║");
+        System.out.println("╠════════════════════════════════════╣");
+        System.out.printf("║ Final Score:    %-20d ║%n", statistics.getFinalScore());
+        System.out.printf("║ Lines Cleared:  %-20d ║%n", statistics.getTotalLinesCleared());
+        System.out.printf("║ Pieces Placed:  %-20d ║%n", statistics.getPiecesPlaced());
+        System.out.printf("║ Duration:       %-6.1fs           ║%n", statistics.getPlayDurationSeconds());
+        System.out.printf("║ Difficulty:     %-20s ║%n", statistics.getDifficulty().name());
+        System.out.printf("║ Score/Line:     %-20.1f ║%n", statistics.getScorePerLine());
+        System.out.printf("║ Score/Piece:    %-20.1f ║%n", statistics.getScorePerPiece());
+        System.out.println("╚════════════════════════════════════╝");
     }
 
     /**

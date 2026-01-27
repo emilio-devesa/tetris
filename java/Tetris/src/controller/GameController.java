@@ -2,6 +2,7 @@ package controller;
 
 import model.*;
 import engine.GameEngine;
+import engine.GameDemo;
 import view.Renderer;
 import java.util.Scanner;
 
@@ -18,13 +19,19 @@ import java.util.Scanner;
  * - Non-blocking input handling
  * - Separate render and input loops for responsive UI
  * - Difficulty selection before game starts
+ * - High score tracking and persistence
+ * - Game statistics collection
+ * - Demo mode for automatic play
  * - Thread-safe state management
  */
 public class GameController {
     private final GameEngine engine;
     private final Renderer renderer;
+    private final HighScoreManager highScoreManager;
     private GameState state;
     private boolean running;
+    private long gameStartTime;
+    private int piecesPlaced;
 
     /**
      * Constructs a new GameController with default settings.
@@ -32,8 +39,10 @@ public class GameController {
     public GameController() {
         this.engine = new GameEngine();
         this.renderer = new Renderer();
+        this.highScoreManager = new HighScoreManager();
         this.state = new GameState();
         this.running = false;
+        this.piecesPlaced = 0;
     }
 
     /**
@@ -41,9 +50,62 @@ public class GameController {
      * Prompts for difficulty selection, then runs the game loop.
      */
     public void play() {
+        // Show main menu
+        int choice = showMainMenu();
+        
+        switch (choice) {
+            case 1:
+                playGame();
+                break;
+            case 2:
+                showHighScores();
+                play(); // Return to menu
+                break;
+            case 3:
+                runDemo();
+                play(); // Return to menu
+                break;
+            case 4:
+                System.out.println("Thanks for playing Tetris!");
+                System.exit(0);
+            default:
+                play();
+        }
+    }
+
+    /**
+     * Shows the main menu and returns user choice.
+     *
+     * @return selected menu option
+     */
+    private int showMainMenu() {
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║     TETRIS - Main Menu             ║");
+        System.out.println("╠════════════════════════════════════╣");
+        System.out.println("║ 1 - Play Game                      ║");
+        System.out.println("║ 2 - View High Scores               ║");
+        System.out.println("║ 3 - Watch Demo                     ║");
+        System.out.println("║ 4 - Exit                           ║");
+        System.out.println("╚════════════════════════════════════╝");
+        System.out.print("Choose (1-4): ");
+
+        try {
+            Scanner scanner = new Scanner(System.in);
+            return Integer.parseInt(scanner.nextLine().trim());
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    /**
+     * Starts a normal interactive game.
+     */
+    private void playGame() {
         // Select difficulty
         GameDifficulty difficulty = selectDifficulty();
         state = new GameState(difficulty);
+        gameStartTime = System.currentTimeMillis();
+        piecesPlaced = 0;
 
         running = true;
         renderer.renderHelp();
@@ -61,6 +123,78 @@ public class GameController {
             renderThread.join();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+
+        // Game over - record statistics
+        recordGameStatistics();
+    }
+
+    /**
+     * Records and displays game statistics after game over.
+     */
+    private void recordGameStatistics() {
+        long duration = System.currentTimeMillis() - gameStartTime;
+        GameStatistics stats = new GameStatistics(state, duration, piecesPlaced);
+
+        renderer.renderStatistics(stats);
+
+        boolean isHighScore = highScoreManager.recordScore(stats);
+        if (isHighScore) {
+            System.out.println("\n🎉 NEW HIGH SCORE! 🎉");
+        }
+    }
+
+    /**
+     * Displays high scores menu.
+     */
+    private void showHighScores() {
+        System.out.println();
+        renderer.renderHighScores(highScoreManager.getTopScores());
+        
+        System.out.print("Press Enter to return to menu...");
+        try {
+            Scanner scanner = new Scanner(System.in);
+            scanner.nextLine();
+        } catch (Exception e) {
+            // Continue
+        }
+    }
+
+    /**
+     * Runs an automatic demo game.
+     */
+    private void runDemo() {
+        System.out.println();
+        GameDifficulty difficulty = selectDifficulty();
+        System.out.println("Starting demo mode. Press Ctrl+C to stop...");
+        
+        GameDemo demo = new GameDemo(difficulty);
+        long startTime = System.currentTimeMillis();
+
+        while (!demo.getState().isGameOver() && System.currentTimeMillis() - startTime < 60000) {
+            // Run demo tick and render occasionally
+            if (demo.getTickCount() % 10 == 0) {
+                renderer.clearScreen();
+                renderer.render(demo.getState());
+            }
+            demo.tick();
+
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+
+        GameStatistics stats = demo.runToCompletion();
+        renderer.renderStatistics(stats);
+
+        System.out.print("Press Enter to return to menu...");
+        try {
+            Scanner scanner = new Scanner(System.in);
+            scanner.nextLine();
+        } catch (Exception e) {
+            // Continue
         }
     }
 
@@ -154,7 +288,15 @@ public class GameController {
 
             // Process game tick at regular intervals
             if (now - lastTick >= TICK_INTERVAL) {
+                // Count pieces when board grows
+                int boardSizeBefore = state.getBoard().getOccupiedCells().size();
                 state = engine.tick(state, action);
+                int boardSizeAfter = state.getBoard().getOccupiedCells().size();
+                
+                if (boardSizeAfter > boardSizeBefore) {
+                    piecesPlaced++;
+                }
+                
                 lastTick = now;
             }
 
@@ -229,5 +371,14 @@ public class GameController {
      */
     public void resetWithDifficulty(GameDifficulty difficulty) {
         state = new GameState(difficulty);
+    }
+
+    /**
+     * Returns the high score manager.
+     *
+     * @return the HighScoreManager instance
+     */
+    public HighScoreManager getHighScoreManager() {
+        return highScoreManager;
     }
 }
