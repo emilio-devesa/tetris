@@ -33,7 +33,7 @@ public class GameController {
     private final GameConfig config;
     private GameState state;
     private GameTimer timer;
-    private boolean running;
+    private volatile boolean running;
     private long gameStartTime;
     private int piecesPlaced;
 
@@ -142,8 +142,7 @@ public class GameController {
         // Only prompt for input in terminal mode (Renderer)
         if (view instanceof Renderer) {
             System.out.print("Press Enter to return to menu...");
-            try {
-                Scanner scanner = new Scanner(System.in);
+            try (Scanner scanner = new Scanner(System.in)) {
                 scanner.nextLine();
             } catch (Exception e) {
                 // Continue
@@ -184,8 +183,7 @@ public class GameController {
         // Only prompt for input in terminal mode (Renderer)
         if (view instanceof Renderer) {
             System.out.print("Press Enter to return to menu...");
-            try {
-                Scanner scanner = new Scanner(System.in);
+            try (Scanner scanner = new Scanner(System.in)) {
                 scanner.nextLine();
             } catch (Exception e) {
                 // Continue
