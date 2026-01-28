@@ -47,6 +47,12 @@ public enum GameAction {
     PAUSE,
 
     /**
+     * Quit the game immediately.
+     * Signals to stop the game loop and return to menu.
+     */
+    QUIT,
+
+    /**
      * No action (used for game ticks without player input).
      * Game still applies gravity and other automatic effects.
      */

@@ -16,21 +16,26 @@ This Tetris implementation emphasizes professional software engineering practice
 ```
 ┌─────────────────────────────────────────┐
 │         Tetris.java (Entry Point)       │
+│  - Selects Terminal or GUI mode         │
 ├─────────────────────────────────────────┤
-│       GameController (Orchestration)    │
-│  - Menu management                      │
-│  - Input parsing & distribution         │
-│  - Game loop coordination               │
-├─────────────────────────────────────────┤
-│  ┌──────────────┬─────────────┐        │
-│  │ GameEngine   │  Renderer   │        │
-│  │ (Logic)      │  (Display)  │        │
-│  └──────────────┴─────────────┘        │
-├─────────────────────────────────────────┤
-│   GameState + Model Classes (Data)     │
-│  - Immutable, thread-safe              │
-│  - Builder pattern for mutations       │
-└─────────────────────────────────────────┘
+│    GameController (Orchestration)       │
+│ - Menu management & input parsing       │
+│ - Game loop coordination                │
+│ - Works with abstract GameView          │
+├──────────────────────────────────────────┤
+│  ┌────────────────┬──────────────────┐ │
+│  │  GameEngine    │   GameView       │ │
+│  │  (Game Logic)  │  (Interface)     │ │
+│  │                │  ├─ Renderer     │ │
+│  │                │  │ (Terminal)    │ │
+│  │                │  └─ SwingRenderer│ │
+│  │                │    (GUI)         │ │
+│  └────────────────┴──────────────────┘ │
+├──────────────────────────────────────────┤
+│   GameState + Model Classes (Data)      │
+│  - Immutable, thread-safe               │
+│  - Builder pattern for mutations        │
+└──────────────────────────────────────────┘
 ```
 
 ## Package Structure
@@ -182,10 +187,35 @@ Automated player for demonstration mode:
 
 ### `view/` - User Interface
 
-#### **Renderer.java**
+The view layer is decoupled from the controller through the **GameView interface**, allowing multiple rendering implementations.
+
+#### **GameView.java** (Interface)
+
+Defines the contract for all view implementations:
+
+```java
+public interface GameView {
+    void render(GameState state);           // Render current state
+    GameAction readInput();                 // Non-blocking input
+    void close();                           // Cleanup resources
+    void renderGameOver(GameState state);   // Game over screen
+    void renderHighScores(...);             // Scores display
+    void renderStatistics(...);             // Final stats
+    void renderHelp();                      // Help screen
+    void clearScreen();                     // Clear display
+}
+```
+
+#### **Renderer.java** (Terminal Implementation)
 
 Terminal-based rendering using Unicode characters:
 
+- **Cross-platform** - Works on Linux, macOS, Windows 10+
+- **Lightweight** - No GUI dependencies
+- **ANSI colors** - Color support via escape codes
+- **Non-blocking input** - Scanner polling for responsive gameplay
+
+**Display Layout:**
 ```
 ┌─────────────────┬──────────────────────┐
 │  TETRIS CLONE   │ NEXT PIECE           │
@@ -203,6 +233,30 @@ Terminal-based rendering using Unicode characters:
 └─────────────────┴──────────────────────┘
 Controls: A D S W SPACE P Q
 ```
+
+#### **SwingRenderer.java** (GUI Implementation)
+
+Swing-based graphical interface:
+
+- **Graphical board** - Colored blocks with grid
+- **Native look & feel** - Integrates with system
+- **Statistics panel** - Real-time stats display
+- **Keyboard input** - Event-driven input handling
+- **Window management** - Exit handling via frame
+
+**Key-Event Mapping:**
+- Arrows / WASD for movement and rotation
+- SPACE for drop
+- P for pause
+- ESC/Q for quit
+
+#### Benefits of the View Abstraction
+
+1. **Pluggable rendering** - Add new implementations (JavaFX, LibGDX, web) without changing core logic
+2. **Testing** - Can use mock view implementations
+3. **Separation of concerns** - Controller doesn't depend on rendering details
+4. **Code reuse** - GameEngine and GameState unchanged
+````
 
 **Methods:**
 - `render(GameState)`: Full screen update

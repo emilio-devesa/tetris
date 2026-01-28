@@ -16,7 +16,15 @@ import java.util.Set;
  * - Game over display
  * - Help and control information
  */
-public class Renderer {
+public class Renderer implements GameView {
+    private final java.util.Scanner scanner;
+
+    /**
+     * Constructs a new Renderer with input scanner.
+     */
+    public Renderer() {
+        this.scanner = new java.util.Scanner(System.in);
+    }
     private static final String EMPTY_CELL = "□ ";
     private static final String FILLED_CELL = "■ ";
     private static final String PIECE_CELL = "◆ ";
@@ -134,7 +142,8 @@ public class Renderer {
      *
      * @param state the final game state
      */
-    private void renderGameOver(GameState state) {
+    @Override
+    public void renderGameOver(GameState state) {
         System.out.println();
         System.out.println("╔════════════════════════════════════╗");
         System.out.println("║        GAME OVER                   ║");
@@ -225,5 +234,70 @@ public class Renderer {
         System.out.println("║ - Complete rows to earn points     ║");
         System.out.println("╚════════════════════════════════════╝");
         System.out.println();
+    }
+
+    /**
+     * Reads a single input action from the user (non-blocking).
+     * Maps keyboard input to game actions.
+     *
+     * @return the GameAction input, or null if no input available
+     */
+    @Override
+    public GameAction readInput() {
+        if (!scanner.hasNextLine()) {
+            return null;
+        }
+
+        String input = scanner.nextLine().trim().toUpperCase();
+        if (input.isEmpty()) {
+            return null;
+        }
+
+        return parseInput(input);
+    }
+
+    /**
+     * Parses input string to GameAction.
+     *
+     * @param input the input string (single character or full word)
+     * @return the corresponding GameAction, or null if unrecognized
+     */
+    private GameAction parseInput(String input) {
+        switch (input) {
+            case "A":
+            case "LEFT":
+                return GameAction.LEFT;
+            case "D":
+            case "RIGHT":
+                return GameAction.RIGHT;
+            case "S":
+            case "DOWN":
+                return GameAction.DOWN;
+            case "W":
+            case "ROTATE":
+                return GameAction.ROTATE;
+            case " ":
+            case "SPACE":
+            case "DROP":
+                return GameAction.DROP;
+            case "P":
+            case "PAUSE":
+                return GameAction.PAUSE;
+            case "Q":
+            case "QUIT":
+                return GameAction.QUIT;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Closes the renderer and its resources.
+     */
+    @Override
+    public void close() {
+        if (scanner != null) {
+            scanner.close();
+        }
     }
 }

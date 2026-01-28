@@ -3,7 +3,7 @@ package controller;
 import model.*;
 import engine.GameEngine;
 import engine.GameDemo;
-import view.Renderer;
+import view.GameView;
 import java.util.Scanner;
 
 /**
@@ -26,7 +26,7 @@ import java.util.Scanner;
  */
 public class GameController {
     private final GameEngine engine;
-    private final Renderer renderer;
+    private final GameView view;
     private final HighScoreManager highScoreManager;
     private final GameConfig config;
     private GameState state;
@@ -36,11 +36,13 @@ public class GameController {
     private int piecesPlaced;
 
     /**
-     * Constructs a new GameController with default settings.
+     * Constructs a new GameController with a specific view implementation.
+     *
+     * @param view the GameView implementation (Terminal or Swing)
      */
-    public GameController() {
+    public GameController(GameView view) {
         this.engine = new GameEngine();
-        this.renderer = new Renderer();
+        this.view = view;
         this.highScoreManager = new HighScoreManager();
         this.config = new GameConfig();
         this.state = new GameState();
@@ -112,7 +114,7 @@ public class GameController {
         piecesPlaced = 0;
 
         running = true;
-        renderer.renderHelp();
+        view.renderHelp();
 
         // Start game loop threads
         Thread renderThread = new Thread(this::renderLoop);
@@ -140,7 +142,7 @@ public class GameController {
         long duration = System.currentTimeMillis() - gameStartTime;
         GameStatistics stats = new GameStatistics(state, duration, piecesPlaced);
 
-        renderer.renderStatistics(stats);
+        view.renderStatistics(stats);
 
         boolean isHighScore = highScoreManager.recordScore(stats);
         if (isHighScore) {
@@ -153,7 +155,7 @@ public class GameController {
      */
     private void showHighScores() {
         System.out.println();
-        renderer.renderHighScores(highScoreManager.getTopScores());
+        view.renderHighScores(highScoreManager.getTopScores());
         
         System.out.print("Press Enter to return to menu...");
         try {
@@ -178,8 +180,8 @@ public class GameController {
         while (!demo.getState().isGameOver() && System.currentTimeMillis() - startTime < 60000) {
             // Run demo tick and render occasionally
             if (demo.getTickCount() % 10 == 0) {
-                renderer.clearScreen();
-                renderer.render(demo.getState());
+                view.clearScreen();
+                view.render(demo.getState());
             }
             demo.tick();
 
@@ -191,7 +193,7 @@ public class GameController {
         }
 
         GameStatistics stats = demo.runToCompletion();
-        renderer.renderStatistics(stats);
+        view.renderStatistics(stats);
 
         System.out.print("Press Enter to return to menu...");
         try {
@@ -248,7 +250,7 @@ public class GameController {
         while (running) {
             long now = System.currentTimeMillis();
             if (now - lastRender >= RENDER_INTERVAL) {
-                renderer.render(state);
+                view.render(state);
                 lastRender = now;
             }
 

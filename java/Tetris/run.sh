@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Tetris Run Script
 # Launches the Tetris game
 
@@ -20,6 +18,12 @@ echo -e "${BLUE}║        Welcome to Tetris Clone         ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo
 
+# Parse arguments
+GUI_MODE=false
+if [ "$1" = "--gui" ]; then
+    GUI_MODE=true
+fi
+
 # Check if JAR exists, build if necessary
 if [ ! -f "$JAR_FILE" ]; then
     echo -e "${YELLOW}JAR file not found. Building...${NC}"
@@ -35,18 +39,24 @@ if ! command -v java &> /dev/null; then
 fi
 
 # Run the game
-echo -e "${GREEN}Starting Tetris...${NC}"
-echo -e "${YELLOW}Controls:${NC}"
-echo "  LEFT   - Move left (A)"
-echo "  RIGHT  - Move right (D)"
-echo "  DOWN   - Move down (S)"
-echo "  ROTATE - Rotate piece (W)"
-echo "  DROP   - Drop piece (SPACE)"
-echo "  PAUSE  - Pause/Resume (P)"
-echo "  QUIT   - Exit game (Q)"
-echo
+if [ "$GUI_MODE" = true ]; then
+    echo -e "${GREEN}Starting Tetris in GUI mode...${NC}"
+    echo
+    java -cp "$JAR_FILE" Tetris --gui
+else
+    echo -e "${GREEN}Starting Tetris in Terminal mode...${NC}"
+    echo -e "${YELLOW}Controls:${NC}"
+    echo "  A/LEFT   - Move left"
+    echo "  D/RIGHT  - Move right"
+    echo "  S/DOWN   - Move down"
+    echo "  W/UP     - Rotate piece"
+    echo "  SPACE    - Drop piece"
+    echo "  P        - Pause/Resume"
+    echo "  Q        - Quit game"
+    echo
+    java -cp "$JAR_FILE" Tetris
+fi
 
-java -cp "$JAR_FILE" Tetris "$@"
 EXIT_CODE=$?
 
 echo

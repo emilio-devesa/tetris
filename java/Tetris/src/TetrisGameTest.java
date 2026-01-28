@@ -2,6 +2,7 @@ import controller.GameController;
 import model.*;
 import engine.GameEngine;
 import engine.GameDemo;
+import view.Renderer;
 
 /**
  * Comprehensive test suite for Tetris game.
@@ -398,7 +399,7 @@ public class TetrisGameTest {
 
     private static void testGameControllerInitialization() {
         test("GameController initialization", () -> {
-            GameController controller = new GameController();
+            GameController controller = new GameController(new Renderer());
             GameState state = controller.getState();
 
             assert state != null : "Controller should initialize game state";
@@ -410,7 +411,7 @@ public class TetrisGameTest {
 
     private static void testGameControllerTickProcessing() {
         test("GameController tick processing", () -> {
-            GameController controller = new GameController();
+            GameController controller = new GameController(new Renderer());
             GameState initialState = controller.getState();
 
             controller.tick(GameAction.RIGHT);
@@ -424,7 +425,7 @@ public class TetrisGameTest {
 
     private static void testGameControllerReset() {
         test("GameController reset", () -> {
-            GameController controller = new GameController();
+            GameController controller = new GameController(new Renderer());
 
             // Make some moves
             for (int i = 0; i < 10; i++) {
