@@ -5,11 +5,13 @@
 This Tetris implementation emphasizes professional software engineering practices through:
 
 1. **Immutability & Thread Safety**: All core game state is immutable
-2. **Separation of Concerns**: Clear MVC boundaries
+2. **Separation of Concerns**: Clear MVC boundaries with delegated view handling
 3. **Pure Functions**: Game engine uses functional transformations
-4. **Design Patterns**: Builder, Enum-based configuration, Factory
-5. **Comprehensive Testing**: 23 unit tests with high coverage
+4. **Design Patterns**: Builder, Enum-based configuration, Strategy pattern
+5. **Comprehensive Testing**: 33 unit tests with high coverage
 6. **Persistent State**: Configuration and scores stored to disk
+7. **Responsive Input**: Non-blocking input handling in both terminal and GUI modes
+8. **Custom UI Components**: Vertical button dialogs for improved user experience
 
 ## Architecture Overview
 
@@ -49,20 +51,26 @@ All model classes are **immutable** and use **Builder pattern** for creating mod
 - Provides translation operations
 - Used throughout for positioning
 
-#### **Tetromino.java** (7 pieces + templates)
-- Represents a Tetris piece
-- `Tetromino.Type` enum: I, O, T, S, Z, J, L
+#### **Tetromino.java** (L-piece implementation)
+- Represents a Tetris piece (L-shaped tetromino)
+- `rotationState`: 0-3 for 4 rotation orientations
 - Methods: `rotate()`, `moveBy(Point)`, `at(Point)`
-- All rotations pre-calculated and verified
+- All 4 rotations pre-calculated and verified
+- Current implementation uses single L-piece type (extensible to 7 Tetris pieces via Type enum)
 
 #### **Board.java**
 - 10×20 grid representing game surface
 - Methods:
   - `canPlace(Tetromino)`: Collision detection
   - `withPiece(Tetromino)`: Add piece to board
-  - `clearLines()`: Line detection and removal
+  - `clearLines()`: Line detection and removal with gravity physics
   - `isFull()`: Game over detection
 - Immutable with efficient state copying
+- **Critical Bug Fix**: Fixed gravity physics in `clearLines()` method
+  - Issue: After clearing lines, pieces above didn't fall down
+  - Root cause: Incorrect row index operation (subtraction instead of addition)
+  - Solution: Changed `row - clearedRow` to `row + clearedRow` for correct downward movement
+  - Validated with `testBoardLineClearingWithGravity()` test
 
 #### **GameState.java**
 ```java
@@ -195,16 +203,24 @@ Defines the contract for all view implementations:
 
 ```java
 public interface GameView {
-    void render(GameState state);           // Render current state
-    GameAction readInput();                 // Non-blocking input
-    void close();                           // Cleanup resources
-    void renderGameOver(GameState state);   // Game over screen
-    void renderHighScores(...);             // Scores display
-    void renderStatistics(...);             // Final stats
-    void renderHelp();                      // Help screen
-    void clearScreen();                     // Clear display
+    void render(GameState state);                    // Render current state
+    GameAction readInput();                          // Non-blocking input
+    void close();                                    // Cleanup resources
+    void renderGameOver(GameState state);            // Game over screen
+    void renderHighScores(List<HighScore> scores);   // Scores display
+    void renderStatistics(GameStatistics stats);     // Final stats
+    void renderHelp();                               // Help screen
+    void clearScreen();                              // Clear display
+    int showMainMenu();                              // Main menu dialog (returns 1-4)
+    GameDifficulty selectDifficulty();               // Difficulty selection dialog
 }
 ```
+
+**Key Improvements:**
+- `showMainMenu()` and `selectDifficulty()` delegated to view layer
+- Allows terminal vs GUI to handle menu displays differently
+- Terminal: Console-based text menus
+- GUI: Custom vertical button dialogs with JDialog
 
 #### **Renderer.java** (Terminal Implementation)
 
@@ -213,7 +229,9 @@ Terminal-based rendering using Unicode characters:
 - **Cross-platform** - Works on Linux, macOS, Windows 10+
 - **Lightweight** - No GUI dependencies
 - **ANSI colors** - Color support via escape codes
-- **Non-blocking input** - Scanner polling for responsive gameplay
+- **Non-blocking input** - Uses System.in.available() for responsive gameplay without blocking ticks
+- **Menu delegation** - Implements showMainMenu() and selectDifficulty() with ASCII box dialogs
+- **Input improvement** - Scanner input with proper error handling and default values
 
 **Display Layout:**
 ```
@@ -236,19 +254,34 @@ Controls: A D S W SPACE P Q
 
 #### **SwingRenderer.java** (GUI Implementation)
 
-Swing-based graphical interface:
+Swing-based graphical interface with custom dialog components:
 
 - **Graphical board** - Colored blocks with grid
 - **Native look & feel** - Integrates with system
 - **Statistics panel** - Real-time stats display
-- **Keyboard input** - Event-driven input handling
+- **Keyboard input** - Event-driven key listening with Set<Integer> tracking
 - **Window management** - Exit handling via frame
+- **Custom vertical dialogs** - Main menu and difficulty selection with vertical button layout
+- **Responsive controls** - Continuous key tracking for smooth movement
+
+**Custom Dialog Implementation:**
+- `showVerticalOptionDialog()`: Helper method creating custom JDialog with vertical button layout
+- Main menu: 4 buttons stacked vertically (Play Game, View High Scores, Watch Demo, Exit)
+- Difficulty dialog: 4 buttons stacked vertically (EASY, NORMAL, HARD, EXTREME)
+- Each button: 300×40 pixels with 10px spacing
+- Supports default button focus and keyboard navigation
 
 **Key-Event Mapping:**
-- Arrows / WASD for movement and rotation
-- SPACE for drop
+- Arrow keys / WASD for movement and rotation
+- SPACE for hard drop
 - P for pause
 - ESC/Q for quit
+- Single key shortcuts: A (left), D (right), S (down), W (rotate)
+
+**Input Handling:**
+- `KeyListener` tracks pressed keys in `Set<Integer> keysPressed`
+- Non-blocking: Continuous checking in input loop
+- Enables smooth multi-key handling (e.g., move left while rotating)
 
 #### Benefits of the View Abstraction
 
@@ -273,24 +306,31 @@ Swing-based graphical interface:
 
 #### **GameController.java**
 
-Main game loop coordinator and menu manager:
+Main game loop coordinator and menu delegation manager:
 
 **Responsibilities:**
-1. **Menu System**: Main menu, difficulty selection, settings
-2. **Input Handling**: Parse user input into GameActions
+1. **Menu Delegation**: Delegates main menu and difficulty selection to view layer
+2. **Input Handling**: Parse user input into GameActions with support for keyboard shortcuts
 3. **Game Loop**: Coordinate engine ticks and rendering
 4. **Thread Management**: Separate render (50ms) and input (100ms) loops
 5. **Feature Integration**: Statistics, timers, configuration
 
 **Key Methods:**
-- `startGame()`: Main entry point, menu loop
-- `playGame()`: Single game session
-- `parseInput(String)`: Convert keyboard input to GameAction
-- `handlePause()`: Pause/resume logic
-- `updateStatistics()`: Track session metrics
+- `play()`: Main entry point, calls `view.showMainMenu()` for menu display
+- `playGame()`: Single game session, calls `view.selectDifficulty()` for difficulty selection
+- `runDemo()`: Demo mode, calls `view.selectDifficulty()` for demo difficulty
+- `parseInput(String)`: Convert keyboard input to GameAction (supports A, D, S, W, R, P, Q shortcuts)
+- `inputLoop()`: Non-blocking input handling (100ms polling)
+- `renderLoop()`: Display updates (50ms intervals)
+
+**Key Improvements:**
+- Menu handling delegated to view implementations (showMainMenu, selectDifficulty)
+- Removed internal selectDifficulty() method for cleaner MVC separation
+- Non-blocking input in terminal mode using System.in.available()
+- Key-pressed tracking in GUI mode for responsive multi-key handling
 
 **Threading:**
-- Input thread: Reads user input non-blocking (100ms polling)
+- Input thread: Reads user input non-blocking (100ms polling in terminal, event-driven in GUI)
 - Game thread: Updates state and renders (50ms intervals)
 - Thread-safe state: Immutable GameState passed between threads
 - Synchronized only at critical entry points
@@ -440,7 +480,7 @@ Personal Record (static):
 
 ### Test Suite: `TetrisGameTest.java`
 
-**23 Comprehensive Tests** organized by component:
+**33 Comprehensive Tests** organized by component:
 
 ```
 Model Tests:
@@ -450,34 +490,56 @@ Model Tests:
 ✓ Board collision detection
 ✓ Board occupancy tracking
 ✓ Board line clearing
+✓ Board line clearing with gravity (cells fall down)
+✓ Tetromino occupied cells calculation
+✓ Board boundary and out-of-bounds detection
 
 Engine Tests:
 ✓ GameEngine piece movement
 ✓ GameEngine gravity
-✓ GameEngine line detection
+✓ GameEngine line detection and clearing
 ✓ GameEngine game over condition
 ✓ GameEngine instant drop
-✓ GameEngine wall kick
+✓ GameEngine wall kick on rotation
+✓ GameEngine pause functionality
+✓ GameEngine quit action handling
 
 Configuration Tests:
 ✓ GameDifficulty level differences
 ✓ GameState with difficulty levels
-✓ Score calculation with multiplier
+✓ GameState builder pattern
+✓ Score calculation with difficulty multiplier
+✓ Score persistence across difficulty levels
 
 Controller Tests:
 ✓ GameController initialization
 ✓ GameController tick processing
 ✓ GameController reset
+✓ GameController input parsing
 
 Feature Tests:
 ✓ Exception class hierarchy
 ✓ GameStatistics calculation
 ✓ HighScoreManager functionality
-✓ GameDemo automatic play
 ✓ HighScore serialization
+✓ GameDemo automatic play
+✓ GameConfig preferences
+✓ GameTimer timing and records
 ```
 
-**Coverage:** Model, Engine, and Controller layers fully tested
+**Coverage:** Model, Engine, Controller, and feature layers fully tested (43% increase from 23 tests)
+
+**Key Test Additions:**
+- `testBoardLineClearingWithGravity()`: Validates fix for critical gravity physics bug
+- `testGameEnginePause()`: Pause/resume functionality
+- `testGameEngineActionQuit()`: Quit action handling
+- `testGameControllerParseInput()`: Input parsing and keyboard shortcuts
+- `testGameConfig()`: Configuration preferences persistence
+- `testGameTimer()`: Timing and personal records
+- `testGameStateBuilder()`: Builder pattern validation
+- `testBoardBoundaryDetection()`: Out-of-bounds validation
+- `testScorePersistence()`: Score multiplier across difficulties
+- `testTetriminoOccupiedCells()`: Piece cell calculations
 
 ## Performance Characteristics
 
@@ -536,12 +598,24 @@ This implementation showcases:
 ✅ Immutable data structures for concurrency  
 ✅ Builder pattern for complex object construction  
 ✅ Pure functions in game logic  
-✅ Comprehensive testing without external libraries  
-✅ Clean separation of concerns (MVC)  
+✅ Comprehensive testing without external libraries (33 tests)
+✅ Clean separation of concerns (MVC with view delegation)  
 ✅ Enum-based configuration  
 ✅ File I/O and persistence  
 ✅ Thread coordination without frameworks  
 ✅ Professional documentation (Javadoc + architecture docs)  
 ✅ Meaningful exception hierarchies  
+✅ Non-blocking I/O techniques (System.in.available())
+✅ Custom Swing components (vertical button dialogs)
+✅ Responsive input handling with key-pressed tracking
+✅ Bug fixes with validation through comprehensive tests
+✅ Critical physics bugs identification and resolution
 
-Suitable as reference for professional Java game development.
+**Latest Improvements (January 2026):**
+- Fixed critical gravity physics bug where lines cleared but pieces didn't fall
+- Implemented responsive keyboard controls in both terminal and GUI modes
+- Expanded test coverage from 23 to 33 tests (43% increase)
+- Delegated menu/difficulty selection to view layer for better MVC separation
+- Created custom vertical button dialogs for improved GUI user experience
+
+Suitable as reference for professional Java game development and physics simulation.

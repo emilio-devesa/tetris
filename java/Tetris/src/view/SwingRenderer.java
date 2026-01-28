@@ -1,13 +1,14 @@
 package view;
 
 import model.*;
-import model.Point;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -26,6 +27,7 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
     private final GamePanel gamePanel;
     private final StatsPanel statsPanel;
     private final BlockingQueue<GameAction> inputQueue;
+    private final Set<Integer> keysPressed;
 
     private static final int CELL_SIZE = 30;
     private static final int BOARD_WIDTH = Board.COLS * CELL_SIZE;
@@ -36,6 +38,7 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
      */
     public SwingRenderer() {
         this.inputQueue = new LinkedBlockingQueue<>();
+        this.keysPressed = new HashSet<>();
 
         setTitle("Tetris - Java Clone");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -62,13 +65,16 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
         setLocationRelativeTo(null);
         setVisible(true);
 
+        // Add key listener and ensure focus
         addKeyListener(this);
         setFocusable(true);
+        requestFocus();
     }
 
     @Override
     public void render(GameState state) {
         gamePanel.setGameState(state);
+        gamePanel.setGameOver(false); // Reset Game Over flag when rendering new game state
         statsPanel.setGameState(state);
         SwingUtilities.invokeLater(() -> {
             gamePanel.repaint();
@@ -78,7 +84,36 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
 
     @Override
     public GameAction readInput() {
-        return inputQueue.poll();
+        // First check for queued single-press actions (like DROP, QUIT)
+        GameAction queued = inputQueue.poll();
+        if (queued != null && (queued == GameAction.DROP || queued == GameAction.PAUSE || queued == GameAction.QUIT)) {
+            return queued;
+        }
+        
+        // Otherwise, check for continuous movement actions from held keys
+        GameAction currentAction = determineActionFromPressedKeys();
+        return currentAction != GameAction.NONE ? currentAction : queued;
+    }
+    
+    /**
+     * Determines the action based on currently pressed keys.
+     * Prioritizes movement and rotation actions.
+     */
+    private synchronized GameAction determineActionFromPressedKeys() {
+        // Check in order of priority: rotation > horizontal movement > vertical movement
+        if (keysPressed.contains(KeyEvent.VK_W) || keysPressed.contains(KeyEvent.VK_UP) || keysPressed.contains(KeyEvent.VK_R)) {
+            return GameAction.ROTATE;
+        }
+        if (keysPressed.contains(KeyEvent.VK_A) || keysPressed.contains(KeyEvent.VK_LEFT)) {
+            return GameAction.LEFT;
+        }
+        if (keysPressed.contains(KeyEvent.VK_D) || keysPressed.contains(KeyEvent.VK_RIGHT)) {
+            return GameAction.RIGHT;
+        }
+        if (keysPressed.contains(KeyEvent.VK_S) || keysPressed.contains(KeyEvent.VK_DOWN)) {
+            return GameAction.DOWN;
+        }
+        return GameAction.NONE;
     }
 
     @Override
@@ -146,31 +181,137 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
         // Not applicable for Swing
     }
 
+    /**
+     * Shows the main menu as a dialog in GUI mode.
+     *
+     * @return selected menu option (1-4)
+     */
+    @Override
+    public int showMainMenu() {
+        // Options in correct order for vertical display
+        String[] options = {
+            "1. Play Game",
+            "2. View High Scores",
+            "3. Watch Demo",
+            "4. Exit"
+        };
+
+        int choice = showVerticalOptionDialog(
+                "Welcome to Tetris!\n\nWhat would you like to do?",
+                "Tetris - Main Menu",
+                options,
+                0); // Default to Play Game (index 0)
+
+        // Return the choice directly (1-based)
+        return choice + 1;
+    }
+
+    /**
+     * Helper method to show a dialog with buttons in vertical layout.
+     */
+    private int showVerticalOptionDialog(String message, String title, String[] options, int defaultIndex) {
+        JDialog dialog = new JDialog((Frame) null, title, true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setLocationRelativeTo(this);
+        
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        
+        // Add message
+        JLabel messageLabel = new JLabel("<html>" + message.replace("\n", "<br>") + "</html>");
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(20));
+        
+        // Add buttons panel
+        JPanel buttonsPanel = new JPanel();
+        buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.Y_AXIS));
+        buttonsPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        final int[] choice = {-1};
+        
+        for (int i = 0; i < options.length; i++) {
+            final int index = i;
+            JButton button = new JButton(options[i]);
+            button.setAlignmentX(Component.CENTER_ALIGNMENT);
+            button.setMaximumSize(new Dimension(300, 40));
+            button.setPreferredSize(new Dimension(300, 40));
+            
+            if (i == defaultIndex) {
+                button.setFocusPainted(true);
+                button.requestFocus();
+            }
+            
+            button.addActionListener(e -> {
+                choice[0] = index;
+                dialog.dispose();
+            });
+            
+            buttonsPanel.add(button);
+            if (i < options.length - 1) {
+                buttonsPanel.add(Box.createVerticalStrut(10));
+            }
+        }
+        
+        contentPanel.add(buttonsPanel);
+        dialog.setContentPane(contentPanel);
+        dialog.setSize(400, 300);
+        dialog.setVisible(true);
+        
+        return choice[0] >= 0 ? choice[0] : defaultIndex;
+    }
+
+    /**
+     * Shows difficulty selection as a dialog in GUI mode.
+     * Buttons displayed vertically in reverse order.
+     *
+     * @return selected GameDifficulty
+     */
+    @Override
+    public GameDifficulty selectDifficulty() {
+        // Options in reverse order for vertical display
+        String[] options = {
+            "EXTREME (fastest, 2.0x bonus)",
+            "HARD (faster, 1.5x bonus)",
+            "NORMAL (balanced gameplay)",
+            "EASY (slowest, no multiplier)"
+        };
+
+        int choice = showVerticalOptionDialog(
+                "Select Game Difficulty:",
+                "Tetris - Difficulty Selection",
+                options,
+                2); // Default to NORMAL (index 2 in reversed array)
+
+        // Convert choice to difficulty (reverse mapping)
+        switch (choice) {
+            case 0:
+                return GameDifficulty.EXTREME;
+            case 1:
+                return GameDifficulty.HARD;
+            case 2:
+                return GameDifficulty.NORMAL;
+            case 3:
+                return GameDifficulty.EASY;
+            default:
+                return GameDifficulty.NORMAL;
+        }
+    }
+
     @Override
     public void keyTyped(KeyEvent e) {
         // Not used
     }
 
     @Override
-    public void keyPressed(KeyEvent e) {
+    public synchronized void keyPressed(KeyEvent e) {
+        int keyCode = e.getKeyCode();
+        keysPressed.add(keyCode);
+        
+        // For single-press actions, queue them immediately
         GameAction action = null;
-        switch (e.getKeyCode()) {
-            case KeyEvent.VK_A:
-            case KeyEvent.VK_LEFT:
-                action = GameAction.LEFT;
-                break;
-            case KeyEvent.VK_D:
-            case KeyEvent.VK_RIGHT:
-                action = GameAction.RIGHT;
-                break;
-            case KeyEvent.VK_S:
-            case KeyEvent.VK_DOWN:
-                action = GameAction.DOWN;
-                break;
-            case KeyEvent.VK_W:
-            case KeyEvent.VK_UP:
-                action = GameAction.ROTATE;
-                break;
+        switch (keyCode) {
             case KeyEvent.VK_SPACE:
                 action = GameAction.DROP;
                 break;
@@ -190,16 +331,18 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
             }
         }
     }
-
-    @Override
-    public void keyReleased(KeyEvent e) {
-        // Not used
+    
+    /**
+     * Tracks when keys are released to update the pressed keys set.
+     */
+    public synchronized void keyReleased(KeyEvent e) {
+        keysPressed.remove(e.getKeyCode());
     }
 
     /**
      * Panel for rendering the game board.
      */
-    private static class GamePanel extends JPanel {
+    private class GamePanel extends JPanel {
         private GameState gameState;
         private boolean gameOver = false;
 
@@ -210,6 +353,21 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
 
         GamePanel() {
             setBackground(COLOR_EMPTY);
+            setFocusable(true);
+            addKeyListener(new java.awt.event.KeyListener() {
+                @Override
+                public void keyPressed(java.awt.event.KeyEvent e) {
+                    SwingRenderer.this.keyPressed(e);
+                }
+
+                @Override
+                public void keyTyped(java.awt.event.KeyEvent e) {
+                }
+
+                @Override
+                public void keyReleased(java.awt.event.KeyEvent e) {
+                }
+            });
         }
 
         void setGameState(GameState state) {
@@ -244,7 +402,7 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
                     int x = 10 + col * CELL_SIZE;
                     int y = 10 + row * CELL_SIZE;
 
-                    Point cell = new Point(row, col);
+                    model.Point cell = new model.Point(row, col);
                     if (piece.getOccupiedCells().contains(cell)) {
                         g2d.setColor(COLOR_FALLING);
                         g2d.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
@@ -342,6 +500,15 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
             }
         }
 
+        /**
+         * Draws a statistics label and value on the graphics context.
+         * Helper method for rendering game statistics in the stats panel.
+         *
+         * @param g2d the Graphics2D context
+         * @param label the label text
+         * @param value the value to display
+         * @param y the y-coordinate for drawing
+         */
         private void drawStat(Graphics2D g2d, String label, String value, int y) {
             g2d.drawString(label + ":", 10, y);
             if (!value.isEmpty()) {

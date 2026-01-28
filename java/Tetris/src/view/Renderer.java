@@ -216,12 +216,13 @@ public class Renderer implements GameView {
         System.out.println("║       TETRIS - Terminal Game       ║");
         System.out.println("╠════════════════════════════════════╣");
         System.out.println("║ Controls:                          ║");
-        System.out.println("║   LEFT   - Move piece left         ║");
-        System.out.println("║   RIGHT  - Move piece right        ║");
-        System.out.println("║   DOWN   - Accelerate piece        ║");
-        System.out.println("║   ROTATE - Rotate piece (wall kick)║");
-        System.out.println("║   DROP   - Instant drop            ║");
-        System.out.println("║   QUIT   - Exit game               ║");
+        System.out.println("║   A / LEFT   - Move piece left     ║");
+        System.out.println("║   D / RIGHT  - Move piece right    ║");
+        System.out.println("║   S / DOWN   - Accelerate piece    ║");
+        System.out.println("║   W/R/ ROTATE- Rotate (wall kick)  ║");
+        System.out.println("║   SPACE/DROP - Instant drop        ║");
+        System.out.println("║   P / PAUSE  - Pause game          ║");
+        System.out.println("║   Q / QUIT   - Exit game           ║");
         System.out.println("╠════════════════════════════════════╣");
         System.out.println("║ Symbols:                           ║");
         System.out.println("║   □ - Empty cell                   ║");
@@ -298,6 +299,67 @@ public class Renderer implements GameView {
     public void close() {
         if (scanner != null) {
             scanner.close();
+        }
+    }
+
+    /**
+     * Shows the main menu in terminal mode.
+     *
+     * @return selected menu option
+     */
+    @Override
+    public int showMainMenu() {
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║     TETRIS - Main Menu             ║");
+        System.out.println("╠════════════════════════════════════╣");
+        System.out.println("║ 1 - Play Game                      ║");
+        System.out.println("║ 2 - View High Scores               ║");
+        System.out.println("║ 3 - Watch Demo                     ║");
+        System.out.println("║ 4 - Exit                           ║");
+        System.out.println("╚════════════════════════════════════╝");
+        System.out.print("Choose (1-4): ");
+
+        try {
+            java.util.Scanner tempScanner = new java.util.Scanner(System.in);
+            return Integer.parseInt(tempScanner.nextLine().trim());
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    /**
+     * Shows difficulty selection in terminal mode.
+     *
+     * @return selected GameDifficulty
+     */
+    @Override
+    public GameDifficulty selectDifficulty() {
+        java.util.Scanner tempScanner = new java.util.Scanner(System.in);
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║     SELECT DIFFICULTY              ║");
+        System.out.println("╠════════════════════════════════════╣");
+        System.out.println("║ 1 - EASY   (slowest, no multiplier)║");
+        System.out.println("║ 2 - NORMAL (balanced gameplay)    ║");
+        System.out.println("║ 3 - HARD   (faster, 1.5x bonus)  ║");
+        System.out.println("║ 4 - EXTREME(fastest, 2.0x bonus) ║");
+        System.out.println("╚════════════════════════════════════╝");
+        System.out.print("Choose (1-4, default=2): ");
+
+        try {
+            String input = tempScanner.nextLine().trim();
+            switch (input) {
+                case "1":
+                    return GameDifficulty.EASY;
+                case "3":
+                    return GameDifficulty.HARD;
+                case "4":
+                    return GameDifficulty.EXTREME;
+                case "2":
+                default:
+                    return GameDifficulty.NORMAL;
+            }
+        } catch (Exception e) {
+            return GameDifficulty.NORMAL;
         }
     }
 }

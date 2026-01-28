@@ -8,13 +8,16 @@ import java.util.Set;
  * Represents a tetromino piece (L-shaped) on the game board.
  * Immutable class with support for 4 rotation states (0-3).
  *
- * The L-tetromino occupies 4 blocks in one of these patterns:
+ * Current implementation uses the L-tetromino which occupies 4 blocks in one of these patterns:
  * <pre>
  * Rotation 0:     Rotation 1:     Rotation 2:     Rotation 3:
  *   X             X X             X X X           X
  *   X X X         X               X         X X X X X
  *                 X X             X X X     X
  * </pre>
+ *
+ * Future versions could extend to support all 7 standard Tetris pieces (I, O, T, S, Z, J, L)
+ * by introducing a Type enum and piece-specific rotation tables.
  *
  * @author Tetris Engine
  */

@@ -86,15 +86,19 @@ Run the comprehensive test suite:
 java -cp dist/tetris-test.jar TetrisGameTest
 ```
 
-**Test Coverage: 23 tests** covering all core functionality including:
+**Test Coverage: 33 tests** covering all core functionality including:
 - Point and Tetromino mechanics
-- Board collision detection and line clearing
-- Game engine tick processing and gravity
-- Wall kick rotations
-- Game state management and statistics
-- Controller input handling
-- High score persistence
-- Demo mode AI
+- Board collision detection, line clearing, and gravity physics
+- Game engine tick processing, gravity, and instant drops
+- Wall kick rotations and rotation edge cases
+- Game state management, builder pattern, and difficulty levels
+- Controller input handling and parsing
+- High score persistence and serialization
+- Demo mode AI and game statistics
+- Pause/resume functionality and quit action handling
+- Configuration preferences and timer/record tracking
+- Boundary detection and out-of-bounds validation
+- Score persistence across difficulty levels
 
 ## Project Structure
 

@@ -61,7 +61,22 @@ public interface GameView {
     void renderHelp();
 
     /**
-     * Clears the display/screen.
+     * Clears the screen/terminal.
      */
     void clearScreen();
-}
+
+    /**
+     * Shows the main menu and returns the user's choice.
+     * Implementation depends on the view type (terminal or GUI).
+     *
+     * @return menu choice (1-4)
+     */
+    int showMainMenu();
+
+    /**
+     * Shows difficulty selection dialog and returns the selected difficulty.
+     * Implementation depends on the view type (terminal or GUI).
+     *
+     * @return selected GameDifficulty
+     */
+    GameDifficulty selectDifficulty();}

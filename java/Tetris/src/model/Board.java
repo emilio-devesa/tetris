@@ -146,15 +146,13 @@ public class Board {
                 continue; // Skip cells in rows to clear
             }
 
-            // Count how many cleared rows are above this cell
-            int shiftDown = 0;
-            for (Integer clearedRow : rowsToClear) {
-                if (clearedRow < cell.getRow()) {
-                    shiftDown++;
-                }
-            }
+            // Count how many cleared rows are below this cell (row index > cell row)
+            // Each cleared row below causes this cell to fall down by 1
+            long shiftDown = rowsToClear.stream()
+                    .filter(clearedRow -> clearedRow > cell.getRow())
+                    .count();
 
-            newOccupied.add(new Point(cell.getRow() + shiftDown, cell.getCol()));
+            newOccupied.add(new Point(cell.getRow() + (int) shiftDown, cell.getCol()));
         }
 
         return new Board(newOccupied);

@@ -4,6 +4,8 @@ import model.*;
 import engine.GameEngine;
 import engine.GameDemo;
 import view.GameView;
+import view.Renderer;
+import java.io.IOException;
 import java.util.Scanner;
 
 /**
@@ -56,8 +58,8 @@ public class GameController {
      * Prompts for difficulty selection, then runs the game loop.
      */
     public void play() {
-        // Show main menu
-        int choice = showMainMenu();
+        // Show main menu using the view (terminal or GUI)
+        int choice = view.showMainMenu();
         
         switch (choice) {
             case 1:
@@ -80,35 +82,11 @@ public class GameController {
     }
 
     /**
-     * Shows the main menu and returns user choice.
-     *
-     * @return selected menu option
-     */
-    private int showMainMenu() {
-        System.out.println("╔════════════════════════════════════╗");
-        System.out.println("║     TETRIS - Main Menu             ║");
-        System.out.println("╠════════════════════════════════════╣");
-        System.out.println("║ 1 - Play Game                      ║");
-        System.out.println("║ 2 - View High Scores               ║");
-        System.out.println("║ 3 - Watch Demo                     ║");
-        System.out.println("║ 4 - Exit                           ║");
-        System.out.println("╚════════════════════════════════════╝");
-        System.out.print("Choose (1-4): ");
-
-        try {
-            Scanner scanner = new Scanner(System.in);
-            return Integer.parseInt(scanner.nextLine().trim());
-        } catch (Exception e) {
-            return 1;
-        }
-    }
-
-    /**
      * Starts a normal interactive game.
      */
     private void playGame() {
-        // Select difficulty
-        GameDifficulty difficulty = selectDifficulty();
+        // Select difficulty using the view (terminal or GUI)
+        GameDifficulty difficulty = view.selectDifficulty();
         state = new GameState(difficulty);
         gameStartTime = System.currentTimeMillis();
         piecesPlaced = 0;
@@ -131,8 +109,12 @@ public class GameController {
             Thread.currentThread().interrupt();
         }
 
-        // Game over - record statistics
+        // Game over - render game over screen and statistics
+        view.renderGameOver(state);
         recordGameStatistics();
+        
+        // Return to main menu automatically
+        play();
     }
 
     /**
@@ -157,12 +139,15 @@ public class GameController {
         System.out.println();
         view.renderHighScores(highScoreManager.getTopScores());
         
-        System.out.print("Press Enter to return to menu...");
-        try {
-            Scanner scanner = new Scanner(System.in);
-            scanner.nextLine();
-        } catch (Exception e) {
-            // Continue
+        // Only prompt for input in terminal mode (Renderer)
+        if (view instanceof Renderer) {
+            System.out.print("Press Enter to return to menu...");
+            try {
+                Scanner scanner = new Scanner(System.in);
+                scanner.nextLine();
+            } catch (Exception e) {
+                // Continue
+            }
         }
     }
 
@@ -171,7 +156,7 @@ public class GameController {
      */
     private void runDemo() {
         System.out.println();
-        GameDifficulty difficulty = selectDifficulty();
+        GameDifficulty difficulty = view.selectDifficulty();
         System.out.println("Starting demo mode. Press Ctrl+C to stop...");
         
         GameDemo demo = new GameDemo(difficulty);
@@ -193,15 +178,22 @@ public class GameController {
         }
 
         GameStatistics stats = demo.runToCompletion();
+        view.renderGameOver(demo.getState());
         view.renderStatistics(stats);
 
-        System.out.print("Press Enter to return to menu...");
-        try {
-            Scanner scanner = new Scanner(System.in);
-            scanner.nextLine();
-        } catch (Exception e) {
-            // Continue
+        // Only prompt for input in terminal mode (Renderer)
+        if (view instanceof Renderer) {
+            System.out.print("Press Enter to return to menu...");
+            try {
+                Scanner scanner = new Scanner(System.in);
+                scanner.nextLine();
+            } catch (Exception e) {
+                // Continue
+            }
         }
+        
+        // Return to main menu automatically
+        play();
     }
 
     /**
@@ -209,35 +201,6 @@ public class GameController {
      *
      * @return selected GameDifficulty
      */
-    private GameDifficulty selectDifficulty() {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("╔════════════════════════════════════╗");
-        System.out.println("║     SELECT DIFFICULTY              ║");
-        System.out.println("╠════════════════════════════════════╣");
-        System.out.println("║ 1 - EASY   (slowest, no multiplier)║");
-        System.out.println("║ 2 - NORMAL (balanced gameplay)    ║");
-        System.out.println("║ 3 - HARD   (faster, 1.5x bonus)  ║");
-        System.out.println("║ 4 - EXTREME(fastest, 2.0x bonus) ║");
-        System.out.println("╚════════════════════════════════════╝");
-        System.out.print("Choose (1-4, default=2): ");
-
-        try {
-            String input = scanner.nextLine().trim();
-            switch (input) {
-                case "1":
-                    return GameDifficulty.EASY;
-                case "3":
-                    return GameDifficulty.HARD;
-                case "4":
-                    return GameDifficulty.EXTREME;
-                case "2":
-                default:
-                    return GameDifficulty.NORMAL;
-            }
-        } catch (Exception e) {
-            return GameDifficulty.NORMAL;
-        }
-    }
 
     /**
      * Rendering loop - updates display at regular intervals (50ms).
@@ -266,6 +229,7 @@ public class GameController {
     /**
      * Input loop - reads user commands and processes game ticks.
      * Runs in a separate thread to allow non-blocking input.
+     * Works with both terminal and GUI implementations.
      */
     private void inputLoop() {
         Scanner scanner = new Scanner(System.in);
@@ -276,19 +240,31 @@ public class GameController {
             long now = System.currentTimeMillis();
             GameAction action = GameAction.NONE;
 
-            // Check for user input (non-blocking)
-            if (scanner.hasNextLine()) {
-                String input = scanner.nextLine().trim().toUpperCase();
-                GameAction parsedAction = parseInput(input);
+            // Get input from view (works for both terminal and GUI)
+            GameAction inputAction = view.readInput();
+            
+            if (inputAction != null) {
+                if (inputAction == GameAction.QUIT) {
+                    running = false;
+                    break;
+                }
+                action = inputAction;
+            } else if (view instanceof Renderer) {
+                // Terminal-specific fallback input handling with non-blocking check
+                try {
+                    if (System.in.available() > 0 && scanner.hasNextLine()) {
+                        String input = scanner.nextLine().trim().toUpperCase();
+                        GameAction parsedAction = parseInput(input);
 
-                if (parsedAction == null) {
-                    // Special command like QUIT
-                    if ("QUIT".equals(input)) {
-                        running = false;
-                        break;
+                        if (parsedAction == GameAction.QUIT) {
+                            running = false;
+                            break;
+                        } else if (parsedAction != null && parsedAction != GameAction.NONE) {
+                            action = parsedAction;
+                        }
                     }
-                } else {
-                    action = parsedAction;
+                } catch (IOException e) {
+                    // Continue if there's any input error
                 }
             }
 
@@ -320,25 +296,40 @@ public class GameController {
 
     /**
      * Parses user input string to GameAction enum.
+     * Accepts both full commands (LEFT, RIGHT, etc.) and single-key shortcuts (A, D, S, W, R, P).
      *
      * @param input the user input string
      * @return corresponding GameAction, or null for special commands
      */
     private GameAction parseInput(String input) {
+        if (input == null || input.isEmpty()) {
+            return GameAction.NONE;
+        }
+        
+        // Full command names
         switch (input) {
             case "LEFT":
+            case "A":  // Shortcut for left
                 return GameAction.LEFT;
             case "RIGHT":
+            case "D":  // Shortcut for right
                 return GameAction.RIGHT;
             case "DOWN":
+            case "S":  // Shortcut for down
                 return GameAction.DOWN;
             case "ROTATE":
+            case "R":  // Shortcut for rotate
+            case "W":  // Alternative shortcut for rotate (up)
                 return GameAction.ROTATE;
             case "DROP":
+            case "SPACE":
+            case " ":  // Spacebar for drop
                 return GameAction.DROP;
             case "PAUSE":
+            case "P":  // Shortcut for pause
                 return GameAction.PAUSE;
             case "QUIT":
+            case "Q":  // Shortcut for quit
                 return null; // Special case
             default:
                 return GameAction.NONE;

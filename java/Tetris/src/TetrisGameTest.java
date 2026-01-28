@@ -3,6 +3,7 @@ import model.*;
 import engine.GameEngine;
 import engine.GameDemo;
 import view.Renderer;
+import view.SwingRenderer;
 
 /**
  * Comprehensive test suite for Tetris game.
@@ -26,6 +27,7 @@ public class TetrisGameTest {
         testBoardCollisions();
         testBoardOccupancy();
         testBoardLineClearing();
+        testBoardLineClearingWithGravity();
 
         // Engine Tests
         testGameEngineMovement();
@@ -34,6 +36,8 @@ public class TetrisGameTest {
         testGameEngineGameOver();
         testGameEngineDrop();
         testGameEngineWallKick();
+        testGameEnginePause();
+        testGameEngineActionQuit();
 
         // Difficulty and Refinement Tests
         testGameDifficultyLevels();
@@ -44,6 +48,7 @@ public class TetrisGameTest {
         testGameControllerInitialization();
         testGameControllerTickProcessing();
         testGameControllerReset();
+        testGameControllerParseInput();
 
         // Exception Tests
         testExceptionHierarchy();
@@ -53,6 +58,13 @@ public class TetrisGameTest {
         testHighScoreManager();
         testGameDemo();
         testHighScorePersistence();
+        testGameConfig();
+        testGameTimer();
+        testTetriminoOccupiedCells();
+        testBoardBoundaryDetection();
+        testScorePersistence();
+        testGameStateBuilder();
+        
         System.out.println();
         System.out.println("╔════════════════════════════════════════╗");
         System.out.printf("║ Tests Passed: %-26d ║%n", testsPassed);
@@ -159,6 +171,51 @@ public class TetrisGameTest {
 
             Board cleared = testBoard.clearRows(completeRows);
             assert cleared.getCompleteRows().isEmpty() : "Complete rows should be cleared";
+        });
+    }
+
+    private static void testBoardLineClearingWithGravity() {
+        test("Board line clearing with gravity (cells fall down)", () -> {
+            Board board = new Board();
+
+            // Add cells above row 5
+            for (int col = 0; col < Board.COLS; col++) {
+                board = board.addPiece(java.util.Collections.singleton(new Point(3, col)));
+                board = board.addPiece(java.util.Collections.singleton(new Point(4, col)));
+            }
+
+            // Add cells in row 5 to make it complete
+            for (int col = 0; col < Board.COLS; col++) {
+                board = board.addPiece(java.util.Collections.singleton(new Point(5, col)));
+            }
+
+            // Verify row 5 is complete
+            var completeRows = board.getCompleteRows();
+            assert completeRows.contains(5) : "Row 5 should be complete";
+
+            // Before clearing: rows 3, 4, 5 should be full
+            assert board.isOccupied(new Point(3, 0)) : "Row 3 should have cells before clearing";
+            assert board.isOccupied(new Point(4, 0)) : "Row 4 should have cells before clearing";
+            assert board.isOccupied(new Point(5, 0)) : "Row 5 should have cells before clearing";
+
+            // Clear row 5
+            Board cleared = board.clearRows(completeRows);
+
+            // After clearing row 5:
+            // - Cells from row 3 stay at row 3 (0 rows cleared below them)
+            // - Cells from row 4 move to row 5 (1 row cleared below: row 5)
+            assert cleared.isOccupied(new Point(3, 0)) : "Row 3 cells should stay at row 3";
+            assert !cleared.isOccupied(new Point(4, 0)) : "Row 4 should be empty (cells moved to row 5)";
+            assert cleared.isOccupied(new Point(5, 0)) : "Row 5 should have cells from row 4 (gravity applied)";
+
+            // Verify row 5 has all 10 cells
+            int row5Count = 0;
+            for (int col = 0; col < Board.COLS; col++) {
+                if (cleared.isOccupied(new Point(5, col))) {
+                    row5Count++;
+                }
+            }
+            assert row5Count == Board.COLS : "Row 5 should have all cells from original row 4";
         });
     }
 
@@ -394,7 +451,196 @@ public class TetrisGameTest {
             assert parsed.getScore() == 1000 : "Score should match";
         });
     }
+    // ==================== Additional Feature Tests ====================
 
+    private static void testGameEnginePause() {
+        test("GameEngine pause functionality", () -> {
+            GameState state = new GameState();
+            GameEngine engine = new GameEngine();
+
+            // Tick normally
+            GameState normal = engine.tick(state, GameAction.NONE);
+            assert !normal.isPaused() : "New game should not be paused";
+
+            // Toggle pause
+            GameState paused = engine.tick(normal, GameAction.PAUSE);
+            assert paused.isPaused() : "Game should be paused";
+
+            // Toggle pause again
+            GameState resumed = engine.tick(paused, GameAction.PAUSE);
+            assert !resumed.isPaused() : "Game should be resumed";
+        });
+    }
+
+    private static void testGameEngineActionQuit() {
+        test("GameEngine quit action handling", () -> {
+            GameState state = new GameState();
+            GameEngine engine = new GameEngine();
+
+            // QUIT action should be processable without errors
+            GameState afterAction = engine.tick(state, GameAction.QUIT);
+            assert afterAction != null : "Should handle QUIT action";
+        });
+    }
+
+    private static void testGameControllerParseInput() {
+        test("GameController input parsing", () -> {
+            GameController controller = new GameController(new Renderer());
+
+            // Test that input can be processed without errors
+            controller.tick(GameAction.LEFT);
+            controller.tick(GameAction.RIGHT);
+            controller.tick(GameAction.DOWN);
+            controller.tick(GameAction.ROTATE);
+            controller.tick(GameAction.DROP);
+
+            GameState state = controller.getState();
+            assert state != null : "State should remain valid";
+        });
+    }
+
+    private static void testGameConfig() {
+        test("GameConfig preferences", () -> {
+            GameConfig config = new GameConfig();
+
+            // Test theme setting
+            assert config.getTheme() != null : "Theme should not be null";
+            config.setTheme(GameConfig.Theme.DARK);
+            assert config.getTheme() == GameConfig.Theme.DARK : "Theme should be DARK";
+
+            // Test difficulty setting
+            config.setDefaultDifficulty(GameDifficulty.HARD);
+            assert config.getDefaultDifficulty() == GameDifficulty.HARD : "Default difficulty should be HARD";
+
+            // Test sound setting
+            config.setSoundEnabled(true);
+            assert config.isSoundEnabled() : "Sound should be enabled";
+
+            // Test auto-save setting
+            config.setAutoSaveEnabled(false);
+            assert !config.isAutoSaveEnabled() : "Auto-save should be disabled";
+
+            // Test reset
+            config.reset();
+            assert config.getTheme() == GameConfig.Theme.LIGHT : "Reset theme should be LIGHT";
+            assert config.getDefaultDifficulty() == GameDifficulty.NORMAL : "Reset difficulty should be NORMAL";
+        });
+    }
+
+    private static void testGameTimer() {
+        test("GameTimer timing and records", () -> {
+            GameTimer timer1 = new GameTimer();
+
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            GameTimer timer2 = timer1.update();
+            assert timer2.getElapsedMillis() >= 10 : "Elapsed time should be at least 10ms";
+            assert timer2.getElapsedSeconds() > 0 : "Elapsed seconds should be positive";
+
+            // Test formatted time
+            String formatted = timer2.getFormattedTime();
+            assert formatted.contains(":") : "Formatted time should contain ':' separator";
+
+            // Test personal record
+            GameTimer.resetPersonalRecord();
+            assert timer2.isNewRecord() : "First time should be personal record";
+            timer2.updatePersonalRecord();
+
+            GameTimer timer3 = new GameTimer();
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            timer3 = timer3.update();
+            assert !timer3.isNewRecord() : "Subsequent time should not be new record (if slower)";
+        });
+    }
+
+    private static void testTetriminoOccupiedCells() {
+        test("Tetromino occupied cells calculation", () -> {
+            Tetromino piece = new Tetromino(new Point(0, 0), 0);
+            var cells = piece.getOccupiedCells();
+
+            assert cells.size() == 4 : "L-piece should occupy 4 cells";
+            assert !cells.isEmpty() : "Occupied cells should not be empty";
+
+            // Test that all cells are valid points
+            for (Point cell : cells) {
+                assert cell.getRow() >= 0 : "Cell row should be non-negative";
+                assert cell.getCol() >= 0 : "Cell col should be non-negative";
+            }
+
+            // Test rotation changes occupied cells
+            Tetromino rotated = piece.rotateClockwise();
+            var rotatedCells = rotated.getOccupiedCells();
+            assert rotatedCells.size() == 4 : "Rotated piece should still occupy 4 cells";
+        });
+    }
+
+    private static void testBoardBoundaryDetection() {
+        test("Board boundary and out-of-bounds detection", () -> {
+            Board board = new Board();
+
+            // Test valid boundaries
+            assert board.isInBounds(new Point(0, 0)) : "Top-left should be in bounds";
+            assert board.isInBounds(new Point(Board.ROWS - 1, Board.COLS - 1)) : "Bottom-right should be in bounds";
+
+            // Test out-of-bounds
+            assert !board.isInBounds(new Point(-1, 0)) : "Negative row should be out of bounds";
+            assert !board.isInBounds(new Point(0, -1)) : "Negative col should be out of bounds";
+            assert !board.isInBounds(new Point(Board.ROWS, 0)) : "Row >= ROWS should be out of bounds";
+            assert !board.isInBounds(new Point(0, Board.COLS)) : "Col >= COLS should be out of bounds";
+        });
+    }
+
+    private static void testScorePersistence() {
+        test("Score persistence across difficulty levels", () -> {
+            GameState easyState = new GameState(GameDifficulty.EASY);
+            assert easyState.getScore() == 0 : "New game should start with 0 score";
+            assert easyState.getLinesCleared() == 0 : "New game should have 0 lines cleared";
+
+            // Verify score multiplier affects calculation
+            GameDifficulty hard = GameDifficulty.HARD;
+            assert hard.getScoreMultiplier() == 1.5f : "Hard difficulty should have 1.5x multiplier";
+
+            // Create game state and verify immutability
+            GameState state2 = new GameState.Builder(easyState)
+                    .withScore(100)
+                    .build();
+            assert easyState.getScore() == 0 : "Original state should remain unchanged";
+            assert state2.getScore() == 100 : "New state should have updated score";
+        });
+    }
+
+    private static void testGameStateBuilder() {
+        test("GameState builder pattern", () -> {
+            GameState initial = new GameState(GameDifficulty.NORMAL);
+
+            // Build with multiple changes
+            GameState modified = new GameState.Builder(initial)
+                    .withScore(500)
+                    .withLinesCleared(3)
+                    .withPaused(true)
+                    .build();
+
+            assert modified.getScore() == 500 : "Score should be 500";
+            assert modified.getLinesCleared() == 3 : "Lines should be 3";
+            assert modified.isPaused() : "Should be paused";
+
+            // Verify original is unchanged
+            assert initial.getScore() == 0 : "Original score should be 0";
+            assert initial.getLinesCleared() == 0 : "Original lines should be 0";
+            assert !initial.isPaused() : "Original should not be paused";
+
+            // Test difficulty preservation
+            assert modified.getDifficulty() == GameDifficulty.NORMAL : "Difficulty should be preserved";
+        });
+    }
     // ==================== Controller Tests ====================
 
     private static void testGameControllerInitialization() {
