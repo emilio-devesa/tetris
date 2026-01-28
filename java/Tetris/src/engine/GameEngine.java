@@ -29,6 +29,8 @@ public class GameEngine {
      * 2. Applies gravity at intervals based on difficulty
      * 3. Increments the tick counter
      * 
+     * If the game is paused, only pause toggle is processed.
+     * 
      * @param state  current game state
      * @param action player action (or NONE for no input)
      * @return new game state after processing
@@ -39,6 +41,18 @@ public class GameEngine {
         }
 
         GameState updated = state;
+
+        // Handle pause toggle
+        if (action == GameAction.PAUSE) {
+            return new GameState.Builder(updated)
+                    .withPaused(!updated.isPaused())
+                    .build();
+        }
+
+        // If paused, don't process other actions or gravity
+        if (updated.isPaused()) {
+            return updated;
+        }
 
         // Process player action
         if (action != GameAction.NONE) {

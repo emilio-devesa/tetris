@@ -28,7 +28,9 @@ public class GameController {
     private final GameEngine engine;
     private final Renderer renderer;
     private final HighScoreManager highScoreManager;
+    private final GameConfig config;
     private GameState state;
+    private GameTimer timer;
     private boolean running;
     private long gameStartTime;
     private int piecesPlaced;
@@ -40,7 +42,9 @@ public class GameController {
         this.engine = new GameEngine();
         this.renderer = new Renderer();
         this.highScoreManager = new HighScoreManager();
+        this.config = new GameConfig();
         this.state = new GameState();
+        this.timer = new GameTimer();
         this.running = false;
         this.piecesPlaced = 0;
     }
@@ -330,6 +334,8 @@ public class GameController {
                 return GameAction.ROTATE;
             case "DROP":
                 return GameAction.DROP;
+            case "PAUSE":
+                return GameAction.PAUSE;
             case "QUIT":
                 return null; // Special case
             default:
@@ -380,5 +386,23 @@ public class GameController {
      */
     public HighScoreManager getHighScoreManager() {
         return highScoreManager;
+    }
+
+    /**
+     * Returns the game configuration.
+     *
+     * @return the GameConfig instance
+     */
+    public GameConfig getConfig() {
+        return config;
+    }
+
+    /**
+     * Returns the game timer.
+     *
+     * @return the GameTimer instance
+     */
+    public GameTimer getTimer() {
+        return timer;
     }
 }

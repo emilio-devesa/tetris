@@ -41,6 +41,12 @@ public enum GameAction {
     DROP,
 
     /**
+     * Pause or resume the game.
+     * While paused, no game logic is processed except pause toggle.
+     */
+    PAUSE,
+
+    /**
      * No action (used for game ticks without player input).
      * Game still applies gravity and other automatic effects.
      */

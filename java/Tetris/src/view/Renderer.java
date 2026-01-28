@@ -89,6 +89,8 @@ public class Renderer {
                 System.out.printf(" Gravity:    %d%n", state.getDifficulty().getGravityTicks());
             } else if (row == 7) {
                 System.out.printf(" Multiplier: %.1fx%n", state.getDifficulty().getScoreMultiplier());
+            } else if (row == 9 && state.isPaused()) {
+                System.out.println(" [PAUSED]");
             } else {
                 System.out.println();
             }
@@ -149,7 +151,7 @@ public class Renderer {
      */
     private void renderControls() {
         System.out.println();
-        System.out.println("Controls: LEFT | RIGHT | DOWN | ROTATE | DROP | QUIT");
+        System.out.println("Controls: LEFT | RIGHT | DOWN | ROTATE | DROP | PAUSE | QUIT");
     }
 
     /**

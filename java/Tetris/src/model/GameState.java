@@ -12,6 +12,7 @@ public class GameState {
     private final boolean gameOver;
     private final long tickCount;
     private final GameDifficulty difficulty;
+    private final boolean paused;
 
     /**
      * Constructs a new GameState with default settings (NORMAL difficulty).
@@ -24,6 +25,7 @@ public class GameState {
         this.gameOver = false;
         this.tickCount = 0;
         this.difficulty = GameDifficulty.NORMAL;
+        this.paused = false;
     }
 
     /**
@@ -39,10 +41,11 @@ public class GameState {
         this.gameOver = false;
         this.tickCount = 0;
         this.difficulty = difficulty;
+        this.paused = false;
     }
 
     private GameState(Board board, Tetromino currentPiece, int score, 
-                     int linesCleared, boolean gameOver, long tickCount, GameDifficulty difficulty) {
+                     int linesCleared, boolean gameOver, long tickCount, GameDifficulty difficulty, boolean paused) {
         this.board = board;
         this.currentPiece = currentPiece;
         this.score = score;
@@ -50,6 +53,7 @@ public class GameState {
         this.gameOver = gameOver;
         this.tickCount = tickCount;
         this.difficulty = difficulty;
+        this.paused = paused;
     }
 
     // Builder pattern for creating modified game states
@@ -61,6 +65,7 @@ public class GameState {
         private boolean gameOver;
         private long tickCount;
         private GameDifficulty difficulty;
+        private boolean paused;
 
         /**
          * Constructs a Builder initialized with values from the given GameState.
@@ -75,6 +80,7 @@ public class GameState {
             this.gameOver = state.gameOver;
             this.tickCount = state.tickCount;
             this.difficulty = state.difficulty;
+            this.paused = state.paused;
         }
 
         public Builder withBoard(Board board) {
@@ -112,13 +118,18 @@ public class GameState {
             return this;
         }
 
+        public Builder withPaused(boolean paused) {
+            this.paused = paused;
+            return this;
+        }
+
         /**
          * Builds and returns a new GameState with the configured values.
          *
          * @return a new GameState instance
          */
         public GameState build() {
-            return new GameState(board, currentPiece, score, linesCleared, gameOver, tickCount, difficulty);
+            return new GameState(board, currentPiece, score, linesCleared, gameOver, tickCount, difficulty, paused);
         }
     }
 
@@ -155,9 +166,18 @@ public class GameState {
         return difficulty;
     }
 
+    /**
+     * Returns whether the game is paused.
+     *
+     * @return true if paused, false otherwise
+     */
+    public boolean isPaused() {
+        return paused;
+    }
+
     @Override
     public String toString() {
-        return String.format("GameState{score=%d, lines=%d, gameOver=%b, tick=%d}",
-                score, linesCleared, gameOver, tickCount);
+        return String.format("GameState{score=%d, lines=%d, gameOver=%b, paused=%b, tick=%d}",
+                score, linesCleared, gameOver, paused, tickCount);
     }
 }
