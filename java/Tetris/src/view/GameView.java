@@ -79,4 +79,13 @@ public interface GameView {
      *
      * @return selected GameDifficulty
      */
-    GameDifficulty selectDifficulty();}
+    GameDifficulty selectDifficulty();
+
+    /**
+     * Shows soundtrack selection dialog and returns the selected soundtrack.
+     * Implementation depends on the view type (terminal or GUI).
+     *
+     * @return selected Soundtrack
+     */
+    AudioManager.Soundtrack selectSoundtrack();
+}

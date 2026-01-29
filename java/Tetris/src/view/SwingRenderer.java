@@ -299,6 +299,42 @@ public class SwingRenderer extends JFrame implements GameView, KeyListener {
         }
     }
 
+    /**
+     * Shows soundtrack selection as a dialog in GUI mode.
+     *
+     * @return selected Soundtrack
+     */
+    @Override
+    public AudioManager.Soundtrack selectSoundtrack() {
+        // Options in correct order for display
+        String[] options = {
+            "Loginska",
+            "Bradinsky",
+            "Karinka",
+            "Troika"
+        };
+
+        int choice = showVerticalOptionDialog(
+                "Select Background Music:",
+                "Tetris - Music Selection",
+                options,
+                0); // Default to Loginska (index 0)
+
+        // Convert choice to soundtrack
+        switch (choice) {
+            case 0:
+                return AudioManager.Soundtrack.MUSIC_1;
+            case 1:
+                return AudioManager.Soundtrack.MUSIC_2;
+            case 2:
+                return AudioManager.Soundtrack.MUSIC_3;
+            case 3:
+                return AudioManager.Soundtrack.MUSIC_4;
+            default:
+                return AudioManager.Soundtrack.MUSIC_1;
+        }
+    }
+
     @Override
     public void keyTyped(KeyEvent e) {
         // Not used

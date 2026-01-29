@@ -5,6 +5,7 @@ import engine.GameEngine;
 import engine.GameDemo;
 import view.GameView;
 import view.Renderer;
+import view.AudioManager;
 import java.io.IOException;
 import java.util.Scanner;
 
@@ -31,6 +32,7 @@ public class GameController {
     private final GameView view;
     private final HighScoreManager highScoreManager;
     private final GameConfig config;
+    private final AudioManager audioManager;
     private GameState state;
     private GameTimer timer;
     private volatile boolean running;
@@ -47,6 +49,8 @@ public class GameController {
         this.view = view;
         this.highScoreManager = new HighScoreManager();
         this.config = new GameConfig();
+        this.audioManager = new AudioManager();
+        this.audioManager.setEnabled(true); // Enable audio by default
         this.state = new GameState();
         this.timer = new GameTimer();
         this.running = false;
@@ -87,6 +91,11 @@ public class GameController {
     private void playGame() {
         // Select difficulty using the view (terminal or GUI)
         GameDifficulty difficulty = view.selectDifficulty();
+        
+        // Select background music using the view (terminal or GUI)
+        AudioManager.Soundtrack soundtrack = view.selectSoundtrack();
+        audioManager.playMusic(soundtrack);
+        
         state = new GameState(difficulty);
         gameStartTime = System.currentTimeMillis();
         piecesPlaced = 0;
@@ -268,13 +277,24 @@ public class GameController {
 
             // Process game tick at regular intervals
             if (now - lastTick >= TICK_INTERVAL) {
-                // Count pieces when board grows
+                // Track state before and after tick
                 int boardSizeBefore = state.getBoard().getOccupiedCells().size();
-                state = engine.tick(state, action);
-                int boardSizeAfter = state.getBoard().getOccupiedCells().size();
+                int linesBefore = state.getLinesCleared();
                 
+                state = engine.tick(state, action);
+                
+                int boardSizeAfter = state.getBoard().getOccupiedCells().size();
+                int linesAfter = state.getLinesCleared();
+                
+                // Play sound when piece is placed
                 if (boardSizeAfter > boardSizeBefore) {
                     piecesPlaced++;
+                    audioManager.playSound(AudioManager.SoundEffect.PIECE_PLACED);
+                }
+                
+                // Play sound when lines are cleared
+                if (linesAfter > linesBefore) {
+                    audioManager.playSound(AudioManager.SoundEffect.LINE_CLEARED);
                 }
                 
                 lastTick = now;

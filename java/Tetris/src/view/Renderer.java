@@ -362,4 +362,41 @@ public class Renderer implements GameView {
             return GameDifficulty.NORMAL;
         }
     }
+
+    /**
+     * Shows soundtrack selection in terminal mode.
+     *
+     * @return selected Soundtrack
+     */
+    @Override
+    public AudioManager.Soundtrack selectSoundtrack() {
+        java.util.Scanner tempScanner = new java.util.Scanner(System.in);
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║     SELECT BACKGROUND MUSIC        ║");
+        System.out.println("╠════════════════════════════════════╣");
+        System.out.println("║ 1 - Loginska                       ║");
+        System.out.println("║ 2 - Bradinsky                      ║");
+        System.out.println("║ 3 - Karinka                        ║");
+        System.out.println("║ 4 - Troika                         ║");
+        System.out.println("╚════════════════════════════════════╝");
+        System.out.print("Choose (1-4, default=1): ");
+
+        try {
+            String input = tempScanner.nextLine().trim();
+            switch (input) {
+                case "1":
+                    return AudioManager.Soundtrack.MUSIC_1;
+                case "2":
+                    return AudioManager.Soundtrack.MUSIC_2;
+                case "3":
+                    return AudioManager.Soundtrack.MUSIC_3;
+                case "4":
+                    return AudioManager.Soundtrack.MUSIC_4;
+                default:
+                    return AudioManager.Soundtrack.MUSIC_1;
+            }
+        } catch (Exception e) {
+            return AudioManager.Soundtrack.MUSIC_1;
+        }
+    }
 }

@@ -4,6 +4,7 @@ import engine.GameEngine;
 import engine.GameDemo;
 import view.Renderer;
 import view.SwingRenderer;
+import view.AudioManager;
 
 /**
  * Comprehensive test suite for Tetris game.
@@ -64,6 +65,7 @@ public class TetrisGameTest {
         testBoardBoundaryDetection();
         testScorePersistence();
         testGameStateBuilder();
+        testAudioManager();
         
         System.out.println();
         System.out.println("╔════════════════════════════════════════╗");
@@ -686,6 +688,50 @@ public class TetrisGameTest {
 
             assert afterReset.getTickCount() == 0 : "Reset should clear tick count";
             assert afterReset.getScore() == 0 : "Reset should clear score";
+        });
+    }
+
+    private static void testAudioManager() {
+        test("AudioManager initialization and settings", () -> {
+            AudioManager audioManager = new AudioManager();
+            
+            // Test initial state
+            assert !audioManager.isEnabled() : "Audio should be disabled by default";
+            assert !audioManager.isMusicPlaying() : "No music should be playing initially";
+            assert audioManager.getCurrentSoundtrack() == null : "Current soundtrack should be null initially";
+            
+            // Test enable/disable
+            audioManager.setEnabled(true);
+            assert audioManager.isEnabled() : "Audio should be enabled after setEnabled(true)";
+            
+            audioManager.setEnabled(false);
+            assert !audioManager.isEnabled() : "Audio should be disabled after setEnabled(false)";
+        });
+
+        test("AudioManager soundtrack enumeration", () -> {
+            AudioManager.Soundtrack[] soundtracks = AudioManager.getAvailableSoundtracks();
+            
+            assert soundtracks.length == 4 : "Should have 4 available soundtracks";
+            assert soundtracks[0] == AudioManager.Soundtrack.MUSIC_1 : "First soundtrack should be MUSIC_1";
+            assert soundtracks[1] == AudioManager.Soundtrack.MUSIC_2 : "Second soundtrack should be MUSIC_2";
+            assert soundtracks[2] == AudioManager.Soundtrack.MUSIC_3 : "Third soundtrack should be MUSIC_3";
+            assert soundtracks[3] == AudioManager.Soundtrack.MUSIC_4 : "Fourth soundtrack should be MUSIC_4";
+            
+            // Test soundtrack properties
+            assert AudioManager.Soundtrack.MUSIC_1.getFilename().equals("music_1.m4a") : "Filename should match";
+            assert AudioManager.Soundtrack.MUSIC_1.getDisplayName().equals("Background Track 1") : "Display name should match";
+        });
+
+        test("AudioManager sound effects enumeration", () -> {
+            AudioManager.SoundEffect[] effects = AudioManager.SoundEffect.values();
+            
+            assert effects.length == 2 : "Should have 2 sound effects";
+            assert effects[0] == AudioManager.SoundEffect.PIECE_PLACED : "First effect should be PIECE_PLACED";
+            assert effects[1] == AudioManager.SoundEffect.LINE_CLEARED : "Second effect should be LINE_CLEARED";
+            
+            // Test effect properties
+            assert AudioManager.SoundEffect.PIECE_PLACED.getFilename().equals("piece_placed.m4a") : "Filename should match";
+            assert AudioManager.SoundEffect.LINE_CLEARED.getFilename().equals("line_cleared.m4a") : "Filename should match";
         });
     }
 
