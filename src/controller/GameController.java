@@ -8,6 +8,15 @@ import view.Renderer;
 import view.AudioManager;
 import java.io.IOException;
 import java.util.Scanner;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 
 /**
  * Controller coordinating input handling with the game engine and view.
@@ -38,6 +47,10 @@ public class GameController {
     private volatile boolean running;
     private long gameStartTime;
     private int piecesPlaced;
+    private final BlockingQueue<GameAction> actionQueue;
+    private ScheduledExecutorService scheduler;
+    private ExecutorService inputExecutor;
+    private final Map<GameAction, Long> lastActionTimestamps;
 
     /**
      * Constructs a new GameController with a specific view implementation.
@@ -55,6 +68,43 @@ public class GameController {
         this.timer = new GameTimer();
         this.running = false;
         this.piecesPlaced = 0;
+        this.actionQueue = new LinkedBlockingQueue<>();
+        this.lastActionTimestamps = new HashMap<>();
+    }
+
+    /**
+     * Determine whether an action should be offered to the queue based on
+     * per-action debounce delays to prevent excessive repeats.
+     */
+    private boolean shouldOfferAction(GameAction action) {
+        if (action == null || action == GameAction.NONE) return false;
+        // Allow immediate for control actions
+        if (action == GameAction.QUIT || action == GameAction.PAUSE) return true;
+
+        long now = System.currentTimeMillis();
+        long last = lastActionTimestamps.getOrDefault(action, 0L);
+        long delay = getDelayForAction(action);
+        if (now - last >= delay) {
+            lastActionTimestamps.put(action, now);
+            return true;
+        }
+        return false;
+    }
+
+    private long getDelayForAction(GameAction action) {
+        switch (action) {
+            case ROTATE:
+                return 300; // slower repeat for rotate
+            case DROP:
+                return 100; // allow quicker repeats for drop
+            case DOWN:
+                return 80;
+            case LEFT:
+            case RIGHT:
+                return 150; // movement repeat delay
+            default:
+                return 150;
+        }
     }
 
     /**
@@ -62,26 +112,29 @@ public class GameController {
      * Prompts for difficulty selection, then runs the game loop.
      */
     public void play() {
-        // Show main menu using the view (terminal or GUI)
-        int choice = view.showMainMenu();
-        
-        switch (choice) {
-            case 1:
-                playGame();
-                break;
-            case 2:
-                showHighScores();
-                play(); // Return to menu
-                break;
-            case 3:
-                runDemo();
-                play(); // Return to menu
-                break;
-            case 4:
-                System.out.println("Thanks for playing Tetris!");
-                System.exit(0);
-            default:
-                play();
+        // Main menu loop — avoids recursive calls to `play()` that grow the stack
+        boolean exit = false;
+        while (!exit) {
+            int choice = view.showMainMenu();
+
+            switch (choice) {
+                case 1:
+                    playGame();
+                    break;
+                case 2:
+                    showHighScores();
+                    break;
+                case 3:
+                    runDemo();
+                    break;
+                case 4:
+                    System.out.println("Thanks for playing Tetris!");
+                    exit = true;
+                    break;
+                default:
+                    // invalid choice — loop again
+                    break;
+            }
         }
     }
 
@@ -103,17 +156,80 @@ public class GameController {
         running = true;
         view.renderHelp();
 
-        // Start game loop threads
-        Thread renderThread = new Thread(this::renderLoop);
-        Thread inputThread = new Thread(this::inputLoop);
+        // Use ScheduledExecutorService for tick and render scheduling,
+        // and a single-thread executor for input producer.
+        final long RENDER_INTERVAL = 50; // ms
+        final long TICK_INTERVAL = 100; // ms
 
-        renderThread.start();
-        inputThread.start();
+        scheduler = Executors.newScheduledThreadPool(2);
+        inputExecutor = Executors.newSingleThreadExecutor();
 
+        // Start input producer (runs until running==false)
+        inputExecutor.submit(this::inputProducerLoop);
+
+        // Schedule render task
+        ScheduledFuture<?> renderFuture = scheduler.scheduleAtFixedRate(() -> {
+            if (running) {
+                view.render(state);
+            }
+        }, 0, RENDER_INTERVAL, TimeUnit.MILLISECONDS);
+
+        // Schedule tick task
+        ScheduledFuture<?> tickFuture = scheduler.scheduleAtFixedRate(() -> {
+            if (!running || state.isGameOver()) {
+                return;
+            }
+
+            // Drain actions keeping the most recent
+            GameAction action = GameAction.NONE;
+            GameAction polled;
+            while ((polled = actionQueue.poll()) != null) {
+                if (polled == GameAction.QUIT) {
+                    running = false;
+                    return;
+                }
+                action = polled;
+            }
+
+            int boardSizeBefore = state.getBoard().getOccupiedCells().size();
+            int linesBefore = state.getLinesCleared();
+
+            state = engine.tick(state, action);
+
+            int boardSizeAfter = state.getBoard().getOccupiedCells().size();
+            int linesAfter = state.getLinesCleared();
+
+            if (boardSizeAfter > boardSizeBefore) {
+                piecesPlaced++;
+                audioManager.playSound(AudioManager.SoundEffect.PIECE_PLACED);
+            }
+
+            if (linesAfter > linesBefore) {
+                audioManager.playSound(AudioManager.SoundEffect.LINE_CLEARED);
+            }
+
+            if (state.isGameOver()) {
+                running = false;
+            }
+        }, 0, TICK_INTERVAL, TimeUnit.MILLISECONDS);
+
+        // Wait until game ends
         try {
-            inputThread.join();
-            running = false;
-            renderThread.join();
+            while (running && !state.isGameOver()) {
+                Thread.sleep(50);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Shutdown executors and cancel scheduled tasks
+        renderFuture.cancel(true);
+        tickFuture.cancel(true);
+        scheduler.shutdownNow();
+        inputExecutor.shutdownNow();
+        try {
+            scheduler.awaitTermination(500, TimeUnit.MILLISECONDS);
+            inputExecutor.awaitTermination(500, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -122,8 +238,7 @@ public class GameController {
         view.renderGameOver(state);
         recordGameStatistics();
         
-        // Return to main menu automatically
-        play();
+        // Return to main menu automatically (handled by play() loop)
     }
 
     /**
@@ -199,8 +314,7 @@ public class GameController {
             }
         }
         
-        // Return to main menu automatically
-        play();
+        // Return to main menu automatically (handled by play() loop)
     }
 
     /**
@@ -239,64 +353,106 @@ public class GameController {
      * Works with both terminal and GUI implementations.
      */
     private void inputLoop() {
-        Scanner scanner = new Scanner(System.in);
+        // Deprecated: replaced by inputProducerLoop() + tickLoop()
+        // Keep method for compatibility but immediately return.
+        return;
+    }
+
+    /**
+     * Producer loop: reads input from the view (or terminal) and offers actions
+     * into the shared `actionQueue`.
+     */
+    private void inputProducerLoop() {
+        Scanner scanner = null;
+        if (view instanceof Renderer) {
+            // Use a scanner for terminal input but do NOT close System.in
+            scanner = new Scanner(System.in);
+        }
+
+        while (running && !state.isGameOver()) {
+            // First try view-provided input (non-blocking if implemented that way)
+            GameAction inputAction = view.readInput();
+
+            if (inputAction != null) {
+                if (inputAction == GameAction.QUIT) {
+                    actionQueue.offer(GameAction.QUIT);
+                    break;
+                } else if (inputAction != GameAction.NONE) {
+                    if (shouldOfferAction(inputAction)) {
+                        actionQueue.offer(inputAction);
+                    }
+                }
+            } else if (scanner != null) {
+                // Terminal fallback (non-blocking check)
+                try {
+                    if (System.in.available() > 0 && scanner.hasNextLine()) {
+                        String input = scanner.nextLine().trim().toUpperCase();
+                        GameAction parsedAction = parseInput(input);
+                        if (parsedAction == GameAction.QUIT) {
+                            actionQueue.offer(GameAction.QUIT);
+                            break;
+                        } else if (parsedAction != null && parsedAction != GameAction.NONE) {
+                            if (shouldOfferAction(parsedAction)) {
+                                actionQueue.offer(parsedAction);
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    // ignore and continue
+                }
+            }
+
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        // Do not close scanner to avoid closing System.in
+    }
+
+    /**
+     * Tick loop: consumes the latest action from `actionQueue` and advances
+     * game state at fixed intervals.
+     */
+    private void tickLoop() {
         long lastTick = System.currentTimeMillis();
         final long TICK_INTERVAL = 100; // milliseconds
 
         while (running && !state.isGameOver()) {
             long now = System.currentTimeMillis();
+
+            // Drain any queued actions and keep the most recent one
             GameAction action = GameAction.NONE;
-
-            // Get input from view (works for both terminal and GUI)
-            GameAction inputAction = view.readInput();
-            
-            if (inputAction != null) {
-                if (inputAction == GameAction.QUIT) {
+            GameAction polled;
+            while ((polled = actionQueue.poll()) != null) {
+                if (polled == GameAction.QUIT) {
                     running = false;
-                    break;
+                    return;
                 }
-                action = inputAction;
-            } else if (view instanceof Renderer) {
-                // Terminal-specific fallback input handling with non-blocking check
-                try {
-                    if (System.in.available() > 0 && scanner.hasNextLine()) {
-                        String input = scanner.nextLine().trim().toUpperCase();
-                        GameAction parsedAction = parseInput(input);
-
-                        if (parsedAction == GameAction.QUIT) {
-                            running = false;
-                            break;
-                        } else if (parsedAction != null && parsedAction != GameAction.NONE) {
-                            action = parsedAction;
-                        }
-                    }
-                } catch (IOException e) {
-                    // Continue if there's any input error
-                }
+                action = polled;
             }
 
-            // Process game tick at regular intervals
             if (now - lastTick >= TICK_INTERVAL) {
-                // Track state before and after tick
                 int boardSizeBefore = state.getBoard().getOccupiedCells().size();
                 int linesBefore = state.getLinesCleared();
-                
+
                 state = engine.tick(state, action);
-                
+
                 int boardSizeAfter = state.getBoard().getOccupiedCells().size();
                 int linesAfter = state.getLinesCleared();
-                
-                // Play sound when piece is placed
+
                 if (boardSizeAfter > boardSizeBefore) {
                     piecesPlaced++;
                     audioManager.playSound(AudioManager.SoundEffect.PIECE_PLACED);
                 }
-                
-                // Play sound when lines are cleared
+
                 if (linesAfter > linesBefore) {
                     audioManager.playSound(AudioManager.SoundEffect.LINE_CLEARED);
                 }
-                
+
                 lastTick = now;
             }
 
@@ -308,7 +464,6 @@ public class GameController {
             }
         }
 
-        scanner.close();
         running = false;
     }
 
