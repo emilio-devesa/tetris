@@ -5,62 +5,41 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Represents a tetromino piece (L-shaped) on the game board.
- * Immutable class with support for 4 rotation states (0-3).
- *
- * Current implementation uses the L-tetromino which occupies 4 blocks in one of these patterns:
- * <pre>
- * Rotation 0:     Rotation 1:     Rotation 2:     Rotation 3:
- *   X             X X             X X X           X
- *   X X X         X               X         X X X X X
- *                 X X             X X X     X
- * </pre>
- *
- * Future versions could extend to support all 7 standard Tetris pieces (I, O, T, S, Z, J, L)
- * by introducing a Type enum and piece-specific rotation tables.
+ * Abstract base class for all tetromino pieces in the Tetris game.
+ * Each tetromino has 4 rotation states and fits within a 4x4 bounding box.
+ * Supports all 7 standard Tetris pieces: I, O, T, S, Z, J, L.
  *
  * @author Tetris Engine
  */
-public class Tetromino {
-    private static final int[][] L_ROTATION_0 = {
-        {0, 0}, {1, 0}, {1, 1}, {1, 2}
-    };
-    private static final int[][] L_ROTATION_1 = {
-        {0, 1}, {0, 2}, {1, 1}, {2, 1}
-    };
-    private static final int[][] L_ROTATION_2 = {
-        {0, 0}, {0, 1}, {0, 2}, {1, 2}
-    };
-    private static final int[][] L_ROTATION_3 = {
-        {0, 1}, {1, 1}, {2, 0}, {2, 1}
-    };
+public abstract class Tetromino {
+    public enum Type {
+        I, O, T, S, Z, J, L
+    }
 
-    private static final int[][][] ROTATIONS = {
-        L_ROTATION_0, L_ROTATION_1, L_ROTATION_2, L_ROTATION_3
-    };
-
-    private final Point position;  // Top-left corner of bounding box
-    private final int rotationState; // 0-3
+    protected final Point position;  // Top-left corner of bounding box
+    protected final int rotationState; // 0-3
+    protected final Type type;
 
     /**
      * Constructs a tetromino at the given position with specified rotation.
      *
      * @param position       the top-left corner of the bounding box
      * @param rotationState  the rotation state (0-3, automatically normalized to 0-3)
+     * @param type           the type of tetromino
      */
-    public Tetromino(Point position, int rotationState) {
+    protected Tetromino(Point position, int rotationState, Type type) {
         this.position = position;
         this.rotationState = rotationState % 4;
+        this.type = type;
     }
 
     /**
-     * Constructs a tetromino at the given position with rotation 0.
+     * Returns the rotation patterns for this tetromino.
+     * Each rotation is an array of [row, col] offsets relative to the bounding box.
      *
-     * @param position the top-left corner of the bounding box
+     * @return 4x4x2 array of rotations
      */
-    public Tetromino(Point position) {
-        this(position, 0);
-    }
+    protected abstract int[][][] getRotations();
 
     /**
      * Returns the absolute coordinates of all blocks that form this tetromino.
@@ -71,7 +50,7 @@ public class Tetromino {
      */
     public Set<Point> getOccupiedCells() {
         Set<Point> cells = new HashSet<>();
-        int[][] pattern = ROTATIONS[rotationState];
+        int[][] pattern = getRotations()[rotationState];
 
         for (int[] offset : pattern) {
             int row = position.getRow() + offset[0];
@@ -90,9 +69,7 @@ public class Tetromino {
      * @param newPosition the new position
      * @return a new Tetromino at the specified position
      */
-    public Tetromino moveTo(Point newPosition) {
-        return new Tetromino(newPosition, rotationState);
-    }
+    public abstract Tetromino moveTo(Point newPosition);
 
     /**
      * Creates a new tetromino rotated clockwise.
@@ -101,26 +78,47 @@ public class Tetromino {
      *
      * @return a new Tetromino rotated clockwise
      */
-    public Tetromino rotateClockwise() {
-        return new Tetromino(position, (rotationState + 1) % 4);
+    public abstract Tetromino rotateClockwise();
+
+    /**
+     * Creates a random tetromino at the given position.
+     *
+     * @param position the top-left corner of the bounding box
+     * @return a new random Tetromino
+     */
+    public static Tetromino createRandom(Point position) {
+        Type[] types = Type.values();
+        Type randomType = types[(int)(Math.random() * types.length)];
+        return create(randomType, position);
     }
 
     /**
-     * Returns the width of the bounding box (always 4 for L-tetromino).
+     * Creates a tetromino of the specified type at the given position.
      *
-     * @return bounding box width
+     * @param type     the type of tetromino
+     * @param position the top-left corner of the bounding box
+     * @return a new Tetromino of the specified type
      */
-    public int getBoundingBoxWidth() {
-        return 4;
+    public static Tetromino create(Type type, Point position) {
+        switch (type) {
+            case I: return new ITetromino(position);
+            case O: return new OTetromino(position);
+            case T: return new TTetromino(position);
+            case S: return new STetromino(position);
+            case Z: return new ZTetromino(position);
+            case J: return new JTetromino(position);
+            case L: return new LTetromino(position);
+            default: throw new IllegalArgumentException("Unknown tetromino type: " + type);
+        }
     }
 
     /**
-     * Returns the height of the bounding box (always 4 for L-tetromino).
+     * Returns the type of this tetromino.
      *
-     * @return bounding box height
+     * @return the Type enum value
      */
-    public int getBoundingBoxHeight() {
-        return 4;
+    public Type getType() {
+        return type;
     }
 
     /**
@@ -144,10 +142,10 @@ public class Tetromino {
     /**
      * Returns a string representation of this tetromino.
      *
-     * @return string with position and rotation information
+     * @return string with type, position and rotation information
      */
     @Override
     public String toString() {
-        return String.format("Tetromino(pos=%s, rotation=%d)", position, rotationState);
+        return String.format("Tetromino(type=%s, pos=%s, rotation=%d)", type, position, rotationState);
     }
 }

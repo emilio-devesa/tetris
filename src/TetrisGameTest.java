@@ -96,7 +96,7 @@ public class TetrisGameTest {
 
     private static void testTetriminoRotations() {
         test("Tetromino rotations", () -> {
-            Tetromino piece = new Tetromino(new Point(0, 0), 0);
+            Tetromino piece = new LTetromino(new Point(0, 0), 0);
             assert piece.getRotationState() == 0 : "Initial rotation should be 0";
 
             Tetromino rotated1 = piece.rotateClockwise();
@@ -113,7 +113,7 @@ public class TetrisGameTest {
     private static void testTetriminoMovement() {
         test("Tetromino movement", () -> {
             Point pos1 = new Point(0, 0);
-            Tetromino piece = new Tetromino(pos1);
+            Tetromino piece = new LTetromino(pos1);
 
             Tetromino moved = piece.moveTo(new Point(1, 1));
             assert moved.getPosition().equals(new Point(1, 1)) : "Position should be updated";
@@ -126,7 +126,7 @@ public class TetrisGameTest {
             Board board = new Board();
 
             // Empty board should allow piece placement
-            Tetromino piece = new Tetromino(new Point(0, 0));
+            Tetromino piece = new LTetromino(new Point(0, 0));
             assert board.canPlacePiece(piece.getOccupiedCells()) : "Should place piece on empty board";
 
             // Out of bounds should be rejected
@@ -142,7 +142,7 @@ public class TetrisGameTest {
     private static void testBoardOccupancy() {
         test("Board occupancy tracking", () -> {
             Board board = new Board();
-            Tetromino piece = new Tetromino(new Point(0, 0));
+            Tetromino piece = new LTetromino(new Point(0, 0));
 
             Board filled = board.addPiece(piece.getOccupiedCells());
             assert filled.getOccupiedCells().size() == 4 : "Should have 4 occupied cells for L-piece";
@@ -565,7 +565,7 @@ public class TetrisGameTest {
 
     private static void testTetriminoOccupiedCells() {
         test("Tetromino occupied cells calculation", () -> {
-            Tetromino piece = new Tetromino(new Point(0, 0), 0);
+            Tetromino piece = new LTetromino(new Point(0, 0), 0);
             var cells = piece.getOccupiedCells();
 
             assert cells.size() == 4 : "L-piece should occupy 4 cells";

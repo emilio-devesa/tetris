@@ -106,7 +106,14 @@ java -cp dist/tetris-test.jar TetrisGameTest
 src/
 ├── model/              # Game data and business logic
 │   ├── Point.java
-│   ├── Tetromino.java
+│   ├── Tetromino.java          # Abstract base class for tetromino pieces
+│   ├── ITetromino.java         # I-shaped piece
+│   ├── OTetromino.java         # O-shaped piece
+│   ├── TTetromino.java         # T-shaped piece
+│   ├── STetromino.java         # S-shaped piece
+│   ├── ZTetromino.java         # Z-shaped piece
+│   ├── JTetromino.java         # J-shaped piece
+│   ├── LTetromino.java         # L-shaped piece
 │   ├── Board.java
 │   ├── GameState.java
 │   ├── GameAction.java

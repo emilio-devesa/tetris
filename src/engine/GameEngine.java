@@ -218,7 +218,7 @@ public class GameEngine {
         int newLinesCleared = state.getLinesCleared() + linesCleared;
 
         // Spawn new piece at top-left
-        Tetromino newPiece = new Tetromino(new Point(0, 0));
+        Tetromino newPiece = Tetromino.createRandom(new Point(0, 0));
 
         // Check if new piece can be placed (game over condition)
         if (!canPlace(newPiece, boardAfterClear)) {

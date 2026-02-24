@@ -19,7 +19,7 @@ public class GameState {
      */
     public GameState() {
         this.board = new Board();
-        this.currentPiece = new Tetromino(new Point(0, 0));
+        this.currentPiece = Tetromino.createRandom(new Point(0, 0));
         this.score = 0;
         this.linesCleared = 0;
         this.gameOver = false;
@@ -35,7 +35,7 @@ public class GameState {
      */
     public GameState(GameDifficulty difficulty) {
         this.board = new Board();
-        this.currentPiece = new Tetromino(new Point(0, 0));
+        this.currentPiece = Tetromino.createRandom(new Point(0, 0));
         this.score = 0;
         this.linesCleared = 0;
         this.gameOver = false;
